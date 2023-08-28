@@ -48,7 +48,7 @@ endif()
 fetchcontent_declare(
     sake
     GIT_REPOSITORY https://github.com/wervin/sake.git
-    GIT_TAG v0.0.1
+    GIT_TAG v0.0.2
     GIT_PROGRESS TRUE
 )
 
@@ -59,6 +59,25 @@ if(NOT sake_POPULATED)
 endif()
 
 set(PRISMA_SOURCES
+    src/prisma/backend/buffers/indexbuffer.c
+    src/prisma/backend/buffers/uniformbuffer.c
+    src/prisma/backend/buffers/vertexbuffer.c
+    src/prisma/backend/buffers/buffer.c
+    src/prisma/backend/models/vertex2d.c
+    src/prisma/backend/commandbuffers.c
+    src/prisma/backend/commandpool.c
+    src/prisma/backend/descriptorpool.c
+    src/prisma/backend/descriptorsetlayout.c
+    src/prisma/backend/descriptorsets.c
+    src/prisma/backend/device.c
+    src/prisma/backend/framebuffers.c
+    src/prisma/backend/instance.c
+    src/prisma/backend/pipeline.c
+    src/prisma/backend/pipelinelayout.c
+    src/prisma/backend/renderpass.c
+    src/prisma/backend/shader.c
+    src/prisma/backend/swapchain.c
+    src/prisma/backend/sync.c
     src/prisma/application.c
     src/prisma/error.c
     src/prisma/log.c
@@ -85,3 +104,13 @@ set_property(TARGET prisma PROPERTY C_STANDARD 17)
 
 target_compile_options(prisma PRIVATE 
     -Wall -Wextra -Wpedantic)
+
+add_custom_target(default.vert.spv
+    COMMAND glslangValidator --quiet -V ${CMAKE_SOURCE_DIR}/shaders/default.vert -o ${CMAKE_BINARY_DIR}/default.vert.spv)
+
+add_custom_target(default.frag.spv
+    COMMAND glslangValidator --quiet -V ${CMAKE_SOURCE_DIR}/shaders/default.frag -o ${CMAKE_BINARY_DIR}/default.frag.spv)
+
+add_dependencies(prisma
+    default.vert.spv
+    default.frag.spv)

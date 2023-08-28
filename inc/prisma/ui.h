@@ -24,6 +24,14 @@ struct prisma_ui
 enum prisma_error prisma_ui_init(struct prisma_ui *ui,
                                  struct prisma_ui_info *info);
 
+
+/*
+ * @brief Draw a frame from Prisma ui
+ * @param ui Prisma ui
+ * @return Error if any
+ */
+enum prisma_error prisma_ui_draw(struct prisma_ui *ui);
+
 /*
  * @brief destroy Prisma ui
  * @param ui Prisma ui

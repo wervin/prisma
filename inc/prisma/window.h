@@ -9,8 +9,6 @@
 
 #include "prisma/error.h"
 
-struct prisma_application;
-
 struct prisma_window_info
 {
     uint32_t default_width;
@@ -27,12 +25,10 @@ struct prisma_window
 /*
  * @brief Init Prisma window
  * @param window Prisma window
- * @param application Prisma application
  * @param info intial information about Prisma window
  * @return Error if any
  */
 enum prisma_error prisma_window_init(struct prisma_window *window,
-                                     struct prisma_application *application,
                                      struct prisma_window_info *info);
 
 /*
@@ -40,6 +36,12 @@ enum prisma_error prisma_window_init(struct prisma_window *window,
  * @param window Prisma window
  */
 void prisma_window_show(struct prisma_window *window);
+
+/*
+ * @brief Gets the Prisma window size
+ * @param window Prisma window
+ */
+VkExtent2D prisma_window_get_extent(struct prisma_window *window);
 
 /*
  * @brief Checks the close flag from Prisma window
@@ -52,6 +54,12 @@ bool prisma_window_should_close(struct prisma_window *window);
  * @param window Prisma window
  */
 void prisma_window_poll_events(struct prisma_window *window);
+
+/*
+ * @brief Wait until events are queued
+ * @param window Prisma window
+ */
+void prisma_window_wait_events(struct prisma_window *window);
 
 /*
  * @brief destroy Prisma window
