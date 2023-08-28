@@ -1,12 +1,12 @@
 #include "prisma/backend/instance.h"
+#include "prisma/window.h"
 
 #include "prisma/log.h"
-#include "prisma/window.h"
 
 #include "sake/macro.h"
 
 static enum prisma_error _create_instance(struct prisma_backend_instance *instance, struct prisma_backend_instance_info *info);
-static enum prisma_error _create_surface(struct prisma_backend_instance *instance, struct prisma_window *window);
+static enum prisma_error _create_surface(struct prisma_backend_instance *instance);
 
 #ifndef NDEBUG
 static enum prisma_error _create_debug_instance(struct prisma_backend_instance *instance);
@@ -19,7 +19,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL _debug_callback(
 
 enum prisma_error prisma_backend_instance_init(
     struct prisma_backend_instance *instance,
-    struct prisma_window *window,
     struct prisma_backend_instance_info *info)
 {
     enum prisma_error status;
@@ -34,7 +33,7 @@ enum prisma_error prisma_backend_instance_init(
         return status;
     }
 #endif
-    status = _create_surface(instance, window);
+    status = _create_surface(instance);
     if (status != PRISMA_ERROR_NONE) {
         return status;
     }
@@ -56,10 +55,6 @@ static enum prisma_error _create_instance(struct prisma_backend_instance *instan
 {
     VkApplicationInfo vk_app_info = {0};
     vk_app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    vk_app_info.pApplicationName = info->application_name;
-    vk_app_info.applicationVersion = VK_MAKE_VERSION(info->application_version_major, info->application_version_minor, info->application_version_revision);
-    vk_app_info.pEngineName = info->application_name;
-    vk_app_info.engineVersion = VK_MAKE_VERSION(info->application_version_major, info->application_version_minor, info->application_version_revision);
     vk_app_info.apiVersion = VK_API_VERSION_1_0;
 
     VkInstanceCreateInfo create_info = {0};
@@ -68,7 +63,7 @@ static enum prisma_error _create_instance(struct prisma_backend_instance *instan
 
     uint32_t glfw_extension_count = 0;
     const char ** glfw_extensions;
-    glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
+    glfw_extensions = prisma_window_get_required_extensions(&glfw_extension_count);
 
 #ifdef NDEBUG
     create_info.enabledExtensionCount = glfw_extension_count;
@@ -110,15 +105,9 @@ static enum prisma_error _create_instance(struct prisma_backend_instance *instan
     return PRISMA_ERROR_NONE;
 }
 
-static enum prisma_error _create_surface(struct prisma_backend_instance *instance, struct prisma_window *window)
+static enum prisma_error _create_surface(struct prisma_backend_instance *instance)
 {
-    if (glfwCreateWindowSurface(instance->vk_instance, window->glfw_window, NULL, &instance->vk_surface) != VK_SUCCESS) 
-    {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_GLFW, "Failed to create window surface");
-        return PRISMA_ERROR_GLFW;
-    }
-
-    return PRISMA_ERROR_NONE;
+    return prisma_window_create_surface(&instance->vk_instance, &instance->vk_surface);
 }
 
 #ifndef NDEBUG

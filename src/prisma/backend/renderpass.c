@@ -3,7 +3,6 @@
 #include "prisma/backend/device.h"
 #include "prisma/backend/instance.h"
 
-#include "prisma/window.h"
 #include "prisma/log.h"
 
 static enum prisma_error _create_renderpass(struct prisma_backend_renderpass *renderpass,

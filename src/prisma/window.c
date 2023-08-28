@@ -2,10 +2,21 @@
 #include "prisma/log.h"
 #include "prisma/window.h"
 
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+#include <vulkan/vulkan.h>
+
 #include "sake/macro.h"
 
-enum prisma_error prisma_window_init(struct prisma_window *window,
-                                     struct prisma_window_info *info)
+struct _window
+{
+    GLFWwindow *glfw_window;
+};
+
+static struct _window _window = {0};
+
+enum prisma_error prisma_window_init(struct prisma_window_info *info)
 {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -13,52 +24,61 @@ enum prisma_error prisma_window_init(struct prisma_window *window,
         glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
-    window->glfw_window = glfwCreateWindow(
+    _window.glfw_window = glfwCreateWindow(
         info->default_width,
         info->default_height,
         info->application_name, NULL, NULL);
-    if (!window->glfw_window)
+    if (!_window.glfw_window)
     {
         PRISMA_LOG_ERROR(PRISMA_ERROR_GLFW, "Failed to create window");
         return PRISMA_ERROR_GLFW;
     }
 
-    // glfwSetWindowUserPointer(application->window.glfw_window, application);
-
     return PRISMA_ERROR_NONE;
 }
 
-void prisma_window_show(struct prisma_window *window)
+void prisma_window_show()
 {
-    glfwShowWindow(window->glfw_window);
+    glfwShowWindow(_window.glfw_window);
 }
 
-VkExtent2D prisma_window_get_extent(struct prisma_window *window)
+void prisma_window_get_extent(uint32_t *width, uint32_t *height)
 {
-    int width, height;
-    glfwGetFramebufferSize(window->glfw_window, &width, &height);
-    return (VkExtent2D){.height = height, .width = width};
+    glfwGetFramebufferSize(_window.glfw_window, (int*) &width, (int*) &height);
 }
 
-bool prisma_window_should_close(struct prisma_window *window)
+bool prisma_window_should_close()
 {
-    return glfwWindowShouldClose(window->glfw_window);
+    return glfwWindowShouldClose(_window.glfw_window);
 }
 
-void prisma_window_wait_events(struct prisma_window *window)
+void prisma_window_wait_events()
 {
-    SAKE_MACRO_UNUSED(window);
     glfwWaitEvents();
 }
 
-void prisma_window_poll_events(struct prisma_window *window)
+enum prisma_error prisma_window_create_surface(void * instance, void *surface)
 {
-    SAKE_MACRO_UNUSED(window);
+    if (glfwCreateWindowSurface(*(VkInstance*) instance, _window.glfw_window, NULL, (VkSurfaceKHR*) surface) != VK_SUCCESS)
+    {
+        PRISMA_LOG_ERROR(PRISMA_ERROR_GLFW, "Failed to create window surface");
+        return PRISMA_ERROR_GLFW;
+    }
+    return PRISMA_ERROR_NONE;
+}
+
+const char** prisma_window_get_required_extensions(uint32_t* count)
+{
+    return glfwGetRequiredInstanceExtensions(count);
+}
+
+void prisma_window_poll_events()
+{
     glfwPollEvents();
 }
 
-void prisma_window_destroy(struct prisma_window *window)
+void prisma_window_destroy()
 {
-    glfwDestroyWindow(window->glfw_window);
+    glfwDestroyWindow(_window.glfw_window);
     glfwTerminate();
 }

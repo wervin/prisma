@@ -7,7 +7,6 @@
 
 #include "prisma/error.h"
 
-struct prisma_window;
 struct prisma_backend_instance;
 struct prisma_backend_device;
 
@@ -37,7 +36,6 @@ enum prisma_error prisma_backend_swapchain_init(
     struct prisma_backend_swapchain *swapchain,
     struct prisma_backend_instance *instance,
     struct prisma_backend_device *device,
-    struct prisma_window *window,
     struct prisma_backend_swapchain_info *info);
 
 void prisma_backend_swapchain_destroy(

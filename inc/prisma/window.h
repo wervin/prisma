@@ -4,9 +4,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
 #include "prisma/error.h"
 
 struct prisma_window_info
@@ -17,54 +14,22 @@ struct prisma_window_info
     const char *application_name;
 };
 
-struct prisma_window
-{
-    GLFWwindow *glfw_window;
-};
+enum prisma_error prisma_window_init(struct prisma_window_info *info);
 
-/*
- * @brief Init Prisma window
- * @param window Prisma window
- * @param info intial information about Prisma window
- * @return Error if any
- */
-enum prisma_error prisma_window_init(struct prisma_window *window,
-                                     struct prisma_window_info *info);
+void prisma_window_show(void);
 
-/*
- * @brief Makes the Prisma window visible
- * @param window Prisma window
- */
-void prisma_window_show(struct prisma_window *window);
+void prisma_window_get_extent(uint32_t *width, uint32_t *height);
 
-/*
- * @brief Gets the Prisma window size
- * @param window Prisma window
- */
-VkExtent2D prisma_window_get_extent(struct prisma_window *window);
+bool prisma_window_should_close(void);
 
-/*
- * @brief Checks the close flag from Prisma window
- * @param window Prisma window
- */
-bool prisma_window_should_close(struct prisma_window *window);
+void prisma_window_poll_events(void);
 
-/*
- * @brief Processes all pending events from Prisma window
- * @param window Prisma window
- */
-void prisma_window_poll_events(struct prisma_window *window);
+void prisma_window_wait_events(void);
 
-/*
- * @brief Wait until events are queued
- * @param window Prisma window
- */
-void prisma_window_wait_events(struct prisma_window *window);
+enum prisma_error prisma_window_create_surface(void * instance, void *surface);
 
-/*
- * @brief destroy Prisma window
- * @param window Prisma window
- */
-void prisma_window_destroy(struct prisma_window *window);
+const char** prisma_window_get_required_extensions(uint32_t* count);
+
+void prisma_window_destroy(void);
 
 #endif /* PRISMA_WINDOW_H */

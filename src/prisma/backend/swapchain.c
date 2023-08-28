@@ -7,14 +7,13 @@
 #include "prisma/backend/swapchain.h"
 #include "prisma/backend/device.h"
 #include "prisma/backend/instance.h"
-#include "prisma/window.h"
 
 #include "prisma/log.h"
+#include "prisma/window.h"
 
 static enum prisma_error _create_swapchain(struct prisma_backend_swapchain *swapchain,
                                            struct prisma_backend_instance *instance,
                                            struct prisma_backend_device *device,
-                                           struct prisma_window *window,
                                            struct prisma_backend_swapchain_info *info);
 
 static bool _support_desired_surface_format(struct prisma_backend_instance *instance,
@@ -34,18 +33,16 @@ static bool _support_desired_array_layer_count(struct prisma_backend_instance *i
                                                struct prisma_backend_swapchain_info *info);
 
 static VkExtent2D _get_current_extent(struct prisma_backend_instance *instance,
-                                      struct prisma_backend_device *device,
-                                      struct prisma_window *window);
+                                      struct prisma_backend_device *device);
 
 enum prisma_error prisma_backend_swapchain_init(struct prisma_backend_swapchain *swapchain,
                                                 struct prisma_backend_instance *instance,
                                                 struct prisma_backend_device *device,
-                                                struct prisma_window *window,
                                                 struct prisma_backend_swapchain_info *info)
 {
     enum prisma_error status;
 
-    status = _create_swapchain(swapchain, instance, device, window, info);
+    status = _create_swapchain(swapchain, instance, device, info);
     if (status != PRISMA_ERROR_NONE) {
         return status;
     }
@@ -71,7 +68,6 @@ void prisma_backend_swapchain_destroy(struct prisma_backend_swapchain *swapchain
 static enum prisma_error _create_swapchain(struct prisma_backend_swapchain *swapchain,
                                            struct prisma_backend_instance *instance,
                                            struct prisma_backend_device *device,
-                                           struct prisma_window *window,
                                            struct prisma_backend_swapchain_info *info)
 {
     if (!_support_desired_surface_format(instance, device, info))
@@ -98,7 +94,7 @@ static enum prisma_error _create_swapchain(struct prisma_backend_swapchain *swap
         return PRISMA_ERROR_VK;
     }
 
-    swapchain->vk_extent = _get_current_extent(instance, device, window);
+    swapchain->vk_extent = _get_current_extent(instance, device);
 
     VkSwapchainCreateInfoKHR swapchain_create_info = {0};
     swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -243,8 +239,7 @@ static bool _support_desired_image_count(struct prisma_backend_instance *instanc
 }
 
 static VkExtent2D _get_current_extent(struct prisma_backend_instance *instance,
-                                      struct prisma_backend_device *device,
-                                      struct prisma_window *window)
+                                      struct prisma_backend_device *device)
 {
     VkSurfaceCapabilitiesKHR capabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->vk_physical_device, 
@@ -257,7 +252,9 @@ static VkExtent2D _get_current_extent(struct prisma_backend_instance *instance,
     } 
     else 
     {
-        VkExtent2D extent = prisma_window_get_extent(window);
+        uint32_t width, height;
+        prisma_window_get_extent(&width, &height);
+        VkExtent2D extent = {.height = height, .width = width};
         extent.width = fmax(capabilities.minImageExtent.width,
                                   fmin(capabilities.maxImageExtent.width, extent.width));
         extent.height = fmax(capabilities.minImageExtent.height,

@@ -7,8 +7,6 @@
 
 #include "prisma/error.h"
 
-struct prisma_window;
-
 struct prisma_backend_instance_info
 {
   const char *application_name;
@@ -33,7 +31,6 @@ struct prisma_backend_instance
 
 enum prisma_error prisma_backend_instance_init(
     struct prisma_backend_instance *instance,
-    struct prisma_window *window,
     struct prisma_backend_instance_info *info);
 
 void prisma_backend_instance_destroy(struct prisma_backend_instance *instance);
