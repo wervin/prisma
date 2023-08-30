@@ -18,7 +18,7 @@ enum prisma_error prisma_window_init(struct prisma_window_info *info);
 
 void prisma_window_show(void);
 
-void prisma_window_get_extent(uint32_t *width, uint32_t *height);
+void prisma_window_get_extent(int *width, int *height);
 
 bool prisma_window_should_close(void);
 

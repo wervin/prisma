@@ -42,9 +42,9 @@ void prisma_window_show()
     glfwShowWindow(_window.glfw_window);
 }
 
-void prisma_window_get_extent(uint32_t *width, uint32_t *height)
+void prisma_window_get_extent(int *width, int *height)
 {
-    glfwGetFramebufferSize(_window.glfw_window, (int*) &width, (int*) &height);
+    glfwGetFramebufferSize(_window.glfw_window, width, height);
 }
 
 bool prisma_window_should_close()

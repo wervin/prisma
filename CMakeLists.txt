@@ -22,7 +22,7 @@ endif()
 fetchcontent_declare(
     cimgui
     GIT_REPOSITORY https://github.com/cimgui/cimgui.git
-    GIT_TAG 1.89.5
+    GIT_TAG 1.88
     GIT_PROGRESS TRUE
 )
 
@@ -31,6 +31,31 @@ if(NOT cimgui_POPULATED)
     fetchcontent_populate(cimgui)
     add_subdirectory(${cimgui_SOURCE_DIR} ${cimgui_BUILD_DIR})
 endif()
+
+add_custom_target(cimgui_backend
+    COMMAND luajit ./generator.lua gcc "internal" glfw vulkan
+    WORKING_DIRECTORY ${cimgui_SOURCE_DIR}/generator
+)
+
+add_library(cimgui_core STATIC
+    ${cimgui_SOURCE_DIR}/cimgui.cpp
+    ${cimgui_SOURCE_DIR}/imgui/imgui.cpp
+    ${cimgui_SOURCE_DIR}/imgui/imgui_draw.cpp
+    ${cimgui_SOURCE_DIR}/imgui/imgui_demo.cpp
+    ${cimgui_SOURCE_DIR}/imgui/imgui_tables.cpp
+    ${cimgui_SOURCE_DIR}/imgui/imgui_widgets.cpp
+)
+
+target_include_directories(cimgui_core PUBLIC
+  ${cimgui_SOURCE_DIR}
+  ${cimgui_SOURCE_DIR}/generator/output
+  ${cimgui_SOURCE_DIR}/imgui
+  ${cimgui_SOURCE_DIR}/imgui/backends
+)
+
+target_compile_definitions(cimgui_core PRIVATE 
+    IMGUI_IMPL_API=extern\ \"C\"
+)
 
 fetchcontent_declare(
     glslang
@@ -59,25 +84,6 @@ if(NOT sake_POPULATED)
 endif()
 
 set(PRISMA_SOURCES
-    src/prisma/backend/buffers/indexbuffer.c
-    src/prisma/backend/buffers/uniformbuffer.c
-    src/prisma/backend/buffers/vertexbuffer.c
-    src/prisma/backend/buffers/buffer.c
-    src/prisma/backend/models/vertex2d.c
-    src/prisma/backend/commandbuffers.c
-    src/prisma/backend/commandpool.c
-    src/prisma/backend/descriptorpool.c
-    src/prisma/backend/descriptorsetlayout.c
-    src/prisma/backend/descriptorsets.c
-    src/prisma/backend/device.c
-    src/prisma/backend/framebuffers.c
-    src/prisma/backend/instance.c
-    src/prisma/backend/pipeline.c
-    src/prisma/backend/pipelinelayout.c
-    src/prisma/backend/renderpass.c
-    src/prisma/backend/shader.c
-    src/prisma/backend/swapchain.c
-    src/prisma/backend/sync.c
     src/prisma/application.c
     src/prisma/error.c
     src/prisma/log.c
@@ -93,7 +99,7 @@ target_link_libraries(prisma
     cglm
     glslang
     sake
-    cimgui
+    cimgui_core
     /usr/lib/x86_64-linux-gnu/libvulkan.so
     /usr/lib/x86_64-linux-gnu/libglfw.so)
 
@@ -105,6 +111,9 @@ set_property(TARGET prisma PROPERTY C_STANDARD 17)
 target_compile_options(prisma PRIVATE 
     -Wall -Wextra -Wpedantic)
 
+target_compile_definitions(prisma PRIVATE 
+    IMGUI_IMPL_API=\ )
+
 add_custom_target(default.vert.spv
     COMMAND glslangValidator --quiet -V ${CMAKE_SOURCE_DIR}/shaders/default.vert -o ${CMAKE_BINARY_DIR}/default.vert.spv)
 
@@ -113,4 +122,5 @@ add_custom_target(default.frag.spv
 
 add_dependencies(prisma
     default.vert.spv
-    default.frag.spv)
+    default.frag.spv
+    cimgui_backend)
