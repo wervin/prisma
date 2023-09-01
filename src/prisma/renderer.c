@@ -365,12 +365,6 @@ static void _backend_descriptorsets_destroy(void);
 
 
 
-static enum prisma_error _backend_ui_init(void);
-
-static void _backend_ui_destroy(void);
-
-
-
 static struct _backend _backend = {0};
 
 static struct _backend_info _backend_info = {
@@ -475,10 +469,6 @@ enum prisma_error prisma_renderer_init(void)
       return status;
 
   status = _backend_descriptorsets_init();
-  if (status != PRISMA_ERROR_NONE)
-      return status;
-
-  status = _backend_ui_init();
   if (status != PRISMA_ERROR_NONE)
       return status;
 
@@ -628,10 +618,13 @@ enum prisma_error prisma_renderer_draw(void)
     return PRISMA_ERROR_NONE;
 }
 
-void prisma_renderer_destroy(void)
+void prisma_renderer_wait_idle(void)
 {
     _backend_device_wait_idle();
-    _backend_ui_destroy();
+}
+
+void prisma_renderer_destroy(void)
+{
     _backend_descriptorsets_destroy();
     _backend_descriptorpool_destroy();
     _backend_uniformbuffer_destroy();
@@ -650,6 +643,67 @@ void prisma_renderer_destroy(void)
     _backend_swapchain_destroy();
     _backend_device_destroy();
     _backend_instance_destroy();
+}
+
+enum prisma_error prisma_renderer_init_ui(void)
+{
+    const uint32_t resource_count = 512;
+    VkDescriptorPoolSize pool_sizes[] = {
+        {VK_DESCRIPTOR_TYPE_SAMPLER, resource_count},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, resource_count},
+        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, resource_count},
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, resource_count},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, resource_count},
+        {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, resource_count},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, resource_count},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, resource_count},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, resource_count},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, resource_count},
+        {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, resource_count}};
+
+    VkDescriptorPoolCreateInfo pool_info = {0};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets = resource_count;
+    pool_info.poolSizeCount = sizeof(pool_sizes) / sizeof(VkDescriptorPoolSize);
+    pool_info.pPoolSizes = pool_sizes;
+
+    if (vkCreateDescriptorPool(_backend.device.vk_device, &pool_info, NULL, &_backend.ui_descriptorpool.vk_descriptorpool) != VK_SUCCESS)
+    {
+        PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create descriptor pool");
+        return PRISMA_ERROR_VK;
+    }
+
+    ImGui_ImplVulkan_InitInfo vulkan_impl_info = {0};
+    vulkan_impl_info.Instance = _backend.instance.vk_instance;
+    vulkan_impl_info.PhysicalDevice = _backend.device.vk_physical_device;
+    vulkan_impl_info.Device = _backend.device.vk_device;
+    vulkan_impl_info.QueueFamily = _backend.device.vk_graphic_queue_index;
+    vulkan_impl_info.Queue = _backend.device.vk_graphic_queue;
+    vulkan_impl_info.PipelineCache = VK_NULL_HANDLE;
+    vulkan_impl_info.DescriptorPool = _backend.ui_descriptorpool.vk_descriptorpool;
+    vulkan_impl_info.Allocator = NULL;
+    vulkan_impl_info.MinImageCount = _backend.swapchain.image_count;
+    vulkan_impl_info.ImageCount = _backend.swapchain.image_count;
+    vulkan_impl_info.MSAASamples = _backend_info.sample_count;
+    if (!ImGui_ImplVulkan_Init(&vulkan_impl_info, _backend.renderpass.vk_renderpass))
+    {
+        PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to instantiate Vulkan for ImGUI");
+        return PRISMA_ERROR_VK; 
+    }
+
+    return PRISMA_ERROR_NONE;
+}
+
+enum prisma_error prisma_renderer_refresh_ui(void)
+{
+    return PRISMA_ERROR_NONE;
+}
+
+void prisma_renderer_destroy_ui(void)
+{
+    ImGui_ImplVulkan_Shutdown();
+    vkDestroyDescriptorPool(_backend.device.vk_device, _backend.ui_descriptorpool.vk_descriptorpool, NULL);
 }
 
 static enum prisma_error _backend_instance_init(void)
@@ -2023,73 +2077,4 @@ static void _backend_descriptorsets_destroy(void)
     {
         free(_backend.descriptorsets.vk_descriptorsets);
     }
-}
-
-static enum prisma_error _backend_ui_init(void)
-{
-    const uint32_t resource_count = 512;
-    VkDescriptorPoolSize pool_sizes[] = {
-        {VK_DESCRIPTOR_TYPE_SAMPLER, resource_count},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, resource_count},
-        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, resource_count},
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, resource_count},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, resource_count},
-        {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, resource_count},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, resource_count},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, resource_count},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, resource_count},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, resource_count},
-        {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, resource_count}};
-
-    VkDescriptorPoolCreateInfo pool_info = {0};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_info.maxSets = resource_count;
-    pool_info.poolSizeCount = sizeof(pool_sizes) / sizeof(VkDescriptorPoolSize);
-    pool_info.pPoolSizes = pool_sizes;
-
-    if (vkCreateDescriptorPool(_backend.device.vk_device, &pool_info, NULL, &_backend.ui_descriptorpool.vk_descriptorpool) != VK_SUCCESS)
-    {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create descriptor pool");
-        return PRISMA_ERROR_VK;
-    }
-
-    // igCreateContext(NULL);
-
-    // ImGuiIO &io = ImGui::GetIO();
-    // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-    // ImGui_ImplGlfw_InitForVulkan(inApplication->GetWindow()->GetWindow(), true);
-
-    // ImGui_ImplVulkan_InitInfo vulkanImplementationInitInfo = {0};
-    // vulkanImplementationInitInfo.Instance = device->GetInstance();
-    // vulkanImplementationInitInfo.PhysicalDevice = device->GetPhysicalDevice();
-    // vulkanImplementationInitInfo.Device = device->GetDevice();
-    // vulkanImplementationInitInfo.QueueFamily = device->GetGraphicsQueueFamilyIndex();
-    // vulkanImplementationInitInfo.Queue = device->GetGraphicsQueue();
-    // vulkanImplementationInitInfo.PipelineCache = VK_NULL_HANDLE;
-    // vulkanImplementationInitInfo.DescriptorPool = imguiDescPool;
-    // vulkanImplementationInitInfo.Allocator = NULL;
-    // vulkanImplementationInitInfo.MinImageCount = swapchain->GetImageCount();
-    // vulkanImplementationInitInfo.ImageCount = swapchain->GetImageCount();
-    // vulkanImplementationInitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-
-    // ImGui_ImplVulkan_Init(&vulkanImplementationInitInfo, swapchain->GetRenderPass());
-
-    // const static float defaultFontSize = 20.0f;
-    // const static std::string fontFileFullPath = GetAbsolutePath("/External/src/imgui/misc/fonts/Cousine-Regular.ttf");
-    // io.Fonts->AddFontFromFileTTF(fontFileFullPath.c_str(), defaultFontSize);
-
-    // VkCommandBuffer commandBuffer = device->BeginSingleTimeCommands();
-    // ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-    // device->EndSingleTimeCommands(commandBuffer);
-
-    // ImGui_ImplVulkan_DestroyFontUploadObjects();
-
-    return PRISMA_ERROR_NONE;
-}
-
-static void _backend_ui_destroy(void)
-{
-    vkDestroyDescriptorPool(_backend.device.vk_device, _backend.ui_descriptorpool.vk_descriptorpool, NULL);
 }

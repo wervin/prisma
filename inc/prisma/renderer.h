@@ -9,6 +9,14 @@ enum prisma_error prisma_renderer_init(void);
 
 enum prisma_error prisma_renderer_draw(void);
 
+void prisma_renderer_wait_idle(void);
+
 void prisma_renderer_destroy(void);
+
+enum prisma_error prisma_renderer_init_ui(void);
+
+enum prisma_error prisma_renderer_refresh_ui(void);
+
+void prisma_renderer_destroy_ui(void);
 
 #endif /* PRISMA_RENDERER_H */

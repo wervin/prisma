@@ -2,10 +2,14 @@
 #include "prisma/log.h"
 #include "prisma/window.h"
 
+#include <vulkan/vulkan.h>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-
-#include <vulkan/vulkan.h>
+#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#include <cimgui.h>
+#define CIMGUI_USE_GLFW
+#define CIMGUI_USE_VULKAN
+#include <cimgui_impl.h>
 
 #include "sake/macro.h"
 
@@ -37,7 +41,7 @@ enum prisma_error prisma_window_init(struct prisma_window_info *info)
     return PRISMA_ERROR_NONE;
 }
 
-void prisma_window_show()
+void prisma_window_show(void)
 {
     glfwShowWindow(_window.glfw_window);
 }
@@ -47,12 +51,12 @@ void prisma_window_get_extent(int *width, int *height)
     glfwGetFramebufferSize(_window.glfw_window, width, height);
 }
 
-bool prisma_window_should_close()
+bool prisma_window_should_close(void)
 {
     return glfwWindowShouldClose(_window.glfw_window);
 }
 
-void prisma_window_wait_events()
+void prisma_window_wait_events(void)
 {
     glfwWaitEvents();
 }
@@ -72,13 +76,33 @@ const char** prisma_window_get_required_extensions(uint32_t* count)
     return glfwGetRequiredInstanceExtensions(count);
 }
 
-void prisma_window_poll_events()
+void prisma_window_poll_events(void)
 {
     glfwPollEvents();
 }
 
-void prisma_window_destroy()
+void prisma_window_destroy(void)
 {
     glfwDestroyWindow(_window.glfw_window);
     glfwTerminate();
+}
+
+enum prisma_error primsa_window_init_ui(void)
+{
+    if (!ImGui_ImplGlfw_InitForVulkan(_window.glfw_window, true))
+    {
+        PRISMA_LOG_ERROR(PRISMA_ERROR_GLFW, "Failed to instantiate GLFw for ImGUI");
+        return PRISMA_ERROR_GLFW; 
+    }
+    return PRISMA_ERROR_NONE;
+}
+
+enum prisma_error prisma_window_refresh_ui(void)
+{
+    return PRISMA_ERROR_NONE;
+}
+
+void prisma_window_destroy_ui(void)
+{
+    ImGui_ImplGlfw_Shutdown();
 }

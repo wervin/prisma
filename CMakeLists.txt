@@ -44,6 +44,8 @@ add_library(cimgui_core STATIC
     ${cimgui_SOURCE_DIR}/imgui/imgui_demo.cpp
     ${cimgui_SOURCE_DIR}/imgui/imgui_tables.cpp
     ${cimgui_SOURCE_DIR}/imgui/imgui_widgets.cpp
+    ${cimgui_SOURCE_DIR}/imgui/backends/imgui_impl_vulkan.cpp
+    ${cimgui_SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp
 )
 
 target_include_directories(cimgui_core PUBLIC

@@ -32,4 +32,10 @@ const char** prisma_window_get_required_extensions(uint32_t* count);
 
 void prisma_window_destroy(void);
 
+enum prisma_error primsa_window_init_ui(void);
+
+enum prisma_error prisma_window_refresh_ui(void);
+
+void prisma_window_destroy_ui(void);
+
 #endif /* PRISMA_WINDOW_H */
