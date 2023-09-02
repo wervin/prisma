@@ -25,6 +25,7 @@ enum prisma_error prisma_ui_init(void)
 
     _ui.imgui_context = igCreateContext(NULL);
     _ui.imgui_io = igGetIO();
+    _ui.imgui_io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     
     status = primsa_window_init_ui();
     if (status != PRISMA_ERROR_NONE)
@@ -48,6 +49,12 @@ enum prisma_error prisma_ui_draw(void)
     status = prisma_renderer_refresh_ui();
     if (status != PRISMA_ERROR_NONE)
         return status;
+
+    igNewFrame();
+
+    igShowDemoWindow(NULL);
+
+    igRender();
 
     return PRISMA_ERROR_NONE;
 }

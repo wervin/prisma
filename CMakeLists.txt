@@ -22,7 +22,7 @@ endif()
 fetchcontent_declare(
     cimgui
     GIT_REPOSITORY https://github.com/cimgui/cimgui.git
-    GIT_TAG 1.88
+    GIT_TAG 1.89.8dock
     GIT_PROGRESS TRUE
 )
 

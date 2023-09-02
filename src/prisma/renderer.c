@@ -569,6 +569,9 @@ enum prisma_error prisma_renderer_draw(void)
 
     vkCmdDrawIndexed(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], _backend.indexbuffer.index_count, 1, 0, 0, 0);
 
+    ImDrawData* drawData = igGetDrawData();
+    ImGui_ImplVulkan_RenderDrawData(drawData, _backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], VK_NULL_HANDLE);
+
     vkCmdEndRenderPass(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight]);
 
     if (vkEndCommandBuffer(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight]) != VK_SUCCESS)
@@ -692,11 +695,40 @@ enum prisma_error prisma_renderer_init_ui(void)
         return PRISMA_ERROR_VK; 
     }
 
+    VkCommandBufferAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = _backend.commandpool.vk_commandpool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandbuffer;
+    vkAllocateCommandBuffers(_backend.device.vk_device, &allocInfo, &commandbuffer);
+
+    VkCommandBufferBeginInfo beginInfo = {0};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandbuffer, &beginInfo);
+
+	ImGui_ImplVulkan_CreateFontsTexture(commandbuffer);
+    
+    vkEndCommandBuffer(commandbuffer);
+
+    VkSubmitInfo submitInfo = {0};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandbuffer;
+
+    vkQueueSubmit(_backend.device.vk_graphic_queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(_backend.device.vk_graphic_queue);
+    vkFreeCommandBuffers(_backend.device.vk_device, _backend.commandpool.vk_commandpool, 1, &commandbuffer);
+
     return PRISMA_ERROR_NONE;
 }
 
 enum prisma_error prisma_renderer_refresh_ui(void)
 {
+    ImGui_ImplVulkan_NewFrame();
     return PRISMA_ERROR_NONE;
 }
 
