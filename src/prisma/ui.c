@@ -26,6 +26,7 @@ enum prisma_error prisma_ui_init(void)
     _ui.imgui_context = igCreateContext(NULL);
     _ui.imgui_io = igGetIO();
     _ui.imgui_io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    // _ui.imgui_io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     
     status = primsa_window_init_ui();
     if (status != PRISMA_ERROR_NONE)
@@ -35,28 +36,29 @@ enum prisma_error prisma_ui_init(void)
     if (status != PRISMA_ERROR_NONE)
         return status;
 
+    status = prisma_renderer_init_viewport();
+    if (status != PRISMA_ERROR_NONE)
+        return status;
+
     return PRISMA_ERROR_NONE;
 }
 
-enum prisma_error prisma_ui_draw(void)
-{
-    enum prisma_error status = PRISMA_ERROR_NONE;
-   
-    status = prisma_window_refresh_ui();
-    if (status != PRISMA_ERROR_NONE)
-        return status;
-
-    status = prisma_renderer_refresh_ui();
-    if (status != PRISMA_ERROR_NONE)
-        return status;
+void prisma_ui_draw(void)
+{   
+    prisma_window_refresh_ui();
+    prisma_renderer_refresh_ui();
 
     igNewFrame();
 
     igShowDemoWindow(NULL);
 
-    igRender();
+    prisma_renderer_draw_ui();
 
-    return PRISMA_ERROR_NONE;
+    prisma_renderer_draw_viewport();
+    
+    igRender();
+    // igUpdatePlatformWindows();
+    // igRenderPlatformWindowsDefault(NULL, NULL);
 }
 
 void prisma_ui_destroy(void)
