@@ -168,6 +168,7 @@ struct _backend_viewport
   VkCommandBuffer *vk_commandbuffers;
   VkRenderPass vk_renderpass;
   VkFramebuffer *vk_framebuffers;
+  VkExtent2D vk_extent;
 };
 
 struct _backend
@@ -580,7 +581,7 @@ enum prisma_error prisma_renderer_draw(void)
     renderpassbegin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderpassbegin_info.renderPass = _backend.viewport.vk_renderpass;
     renderpassbegin_info.renderArea.offset = (VkOffset2D){.x = 0, .y = 0};
-    renderpassbegin_info.renderArea.extent = _backend.swapchain.vk_extent;
+    renderpassbegin_info.renderArea.extent = _backend.viewport.vk_extent;
     renderpassbegin_info.clearValueCount = 1;
     renderpassbegin_info.pClearValues = &clearValue;
     renderpassbegin_info.framebuffer = _backend.viewport.vk_framebuffers[swapchainImageIndex];
@@ -591,15 +592,15 @@ enum prisma_error prisma_renderer_draw(void)
     VkViewport viewport = {0};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = (float)_backend.swapchain.vk_extent.width;
-    viewport.height = (float)_backend.swapchain.vk_extent.height;
+    viewport.width = (float)_backend.viewport.vk_extent.width;
+    viewport.height = (float)_backend.viewport.vk_extent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     vkCmdSetViewport(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight], 0, 1, &viewport);
 
     VkRect2D scissor = {0};
     scissor.offset = (VkOffset2D){.x = 0, .y = 0};
-    scissor.extent = _backend.swapchain.vk_extent;
+    scissor.extent = _backend.viewport.vk_extent;
     vkCmdSetScissor(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight], 0, 1, &scissor);
 
     VkBuffer vertex_buffers[] = {_backend.vertexbuffer.buffer.vk_buffer};
@@ -921,6 +922,7 @@ void prisma_renderer_draw_ui(void)
 void prisma_renderer_destroy_ui(void)
 {
   ImGui_ImplVulkan_Shutdown();
+
   vkDestroyDescriptorPool(_backend.device.vk_device, _backend.ui.vk_descriptorpool, NULL);
 
   if (_backend.ui.vk_framebuffers)
@@ -942,7 +944,7 @@ void prisma_renderer_destroy_ui(void)
   vkDestroyRenderPass(_backend.device.vk_device, _backend.ui.vk_renderpass, NULL);
 }
 
-enum prisma_error prisma_renderer_init_viewport(void)
+enum prisma_error prisma_renderer_init_ui_viewport(void)
 {
   /* Command Pool */
   VkCommandPoolCreateInfo commandpool_info = {0};
@@ -1322,25 +1324,36 @@ enum prisma_error prisma_renderer_init_viewport(void)
   return PRISMA_ERROR_NONE;
 }
 
-void prisma_renderer_draw_viewport(void)
+void prisma_renderer_draw_ui_viewport(void)
 {
   igBegin("Viewport", NULL, 0);
 
   ImVec2 viewport = {0};
   igGetContentRegionAvail(&viewport);
+
+  if (viewport.x <= 0 || viewport.y <= 0)
+    goto end;
+
+  if (viewport.x != _backend.viewport.vk_extent.width || viewport.y != _backend.viewport.vk_extent.height)
+  {
+    _backend.viewport.vk_extent = (VkExtent2D) { .width=viewport.x, .height=viewport.y };
+    _backend_swapchain_recreate();
+    goto end;
+  }
+
   igImage(_backend.viewport.vk_descriptorsets[_backend.current_frame_in_flight],
-          (ImVec2) {viewport.x, viewport.y},
+          (ImVec2) {_backend.viewport.vk_extent.width, _backend.viewport.vk_extent.height},
           (ImVec2) {0, 0},
           (ImVec2) {1, 1},
           (ImVec4) {1, 1, 1, 1},
           (ImVec4) {0, 0, 0, 0});
 
+end:
   igEnd();
 }
 
-void prisma_renderer_destroy_viewport(void)
+void prisma_renderer_destroy_ui_viewport(void)
 {
-  ImGui_ImplVulkan_Shutdown();
   vkDestroySampler(_backend.device.vk_device, _backend.viewport.vk_sampler, NULL);
 
   for (uint32_t i = 0; i < _backend_info.image_count; i++)
@@ -1350,8 +1363,19 @@ void prisma_renderer_destroy_viewport(void)
     vkFreeMemory(_backend.device.vk_device, _backend.viewport.vk_device_memories[i], NULL);
   }
 
+  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+    vkDestroyFramebuffer(_backend.device.vk_device, _backend.viewport.vk_framebuffers[i], NULL);
+
+  vkFreeDescriptorSets(_backend.device.vk_device,
+                       _backend.ui.vk_descriptorpool,
+                       _backend_info.max_frames_in_flight,
+                       _backend.viewport.vk_descriptorsets);
+
+  vkFreeCommandBuffers(_backend.device.vk_device, _backend.viewport.vk_commandpool, _backend_info.max_frames_in_flight, _backend.viewport.vk_commandbuffers);
+  vkDestroyCommandPool(_backend.device.vk_device, _backend.viewport.vk_commandpool, NULL);
   vkDestroyRenderPass(_backend.device.vk_device, _backend.viewport.vk_renderpass, NULL);
   vkDestroyPipeline(_backend.device.vk_device, _backend.viewport.vk_pipeline, NULL);
+
 
   if (_backend.viewport.vk_descriptorsets)
     free(_backend.viewport.vk_descriptorsets);
@@ -1361,6 +1385,10 @@ void prisma_renderer_destroy_viewport(void)
     free(_backend.viewport.vk_images);
   if (_backend.viewport.vk_image_views)
     free(_backend.viewport.vk_image_views);
+  if (_backend.viewport.vk_framebuffers)
+    free(_backend.viewport.vk_framebuffers);
+  if (_backend.viewport.vk_commandbuffers)
+    free(_backend.viewport.vk_commandbuffers);
 }
 
 static enum prisma_error _backend_instance_init(void)
@@ -2036,6 +2064,15 @@ static enum prisma_error _backend_swapchain_recreate(void)
 
   _backend_device_wait_idle();
 
+  if (_backend.viewport.vk_descriptorsets)
+  {
+    vkFreeDescriptorSets(_backend.device.vk_device,
+                         _backend.ui.vk_descriptorpool,
+                         _backend_info.max_frames_in_flight,
+                         _backend.viewport.vk_descriptorsets);
+    free(_backend.viewport.vk_descriptorsets);
+  }
+
   if (_backend.viewport.vk_framebuffers)
   {
     for (uint32_t i = 0; i < _backend_info.image_count; i++)
@@ -2096,7 +2133,6 @@ static enum prisma_error _backend_swapchain_recreate(void)
     vkCreateFramebuffer(_backend.device.vk_device, &framebuffer_info, NULL, &_backend.ui.vk_framebuffers[i]);
   }
 
-
   /* View Port Images */
   _backend.viewport.vk_images = malloc(_backend_info.image_count * sizeof(VkImage));
   if (_backend.viewport.vk_images == NULL)
@@ -2118,8 +2154,8 @@ static enum prisma_error _backend_swapchain_recreate(void)
     imagecreate_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imagecreate_info.imageType = VK_IMAGE_TYPE_2D;
     imagecreate_info.format = _backend_info.vk_surface_format.format;
-    imagecreate_info.extent.width = _backend.swapchain.vk_extent.width;
-    imagecreate_info.extent.height = _backend.swapchain.vk_extent.height;
+    imagecreate_info.extent.width = _backend.viewport.vk_extent.width;
+    imagecreate_info.extent.height = _backend.viewport.vk_extent.height;
     imagecreate_info.extent.depth = 1;
     imagecreate_info.arrayLayers = 1;
     imagecreate_info.mipLevels = 1;
@@ -2258,11 +2294,18 @@ static enum prisma_error _backend_swapchain_recreate(void)
     framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebuffer_info.renderPass = _backend.viewport.vk_renderpass;
     framebuffer_info.attachmentCount = 1;
-    framebuffer_info.width = _backend.swapchain.vk_extent.width;
-    framebuffer_info.height = _backend.swapchain.vk_extent.height;
+    framebuffer_info.width = _backend.viewport.vk_extent.width;
+    framebuffer_info.height = _backend.viewport.vk_extent.height;
     framebuffer_info.layers = 1;
     framebuffer_info.pAttachments = &_backend.viewport.vk_image_views[i];
     vkCreateFramebuffer(_backend.device.vk_device, &framebuffer_info, NULL, &_backend.viewport.vk_framebuffers[i]);
+  }
+
+  _backend.viewport.vk_descriptorsets = malloc(_backend_info.max_frames_in_flight * sizeof(VkDescriptorSet));
+  if (_backend.viewport.vk_descriptorsets == NULL)
+  {
+    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    return PRISMA_ERROR_MEMORY;
   }
 
   for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
@@ -2920,7 +2963,7 @@ static void _backend_uniformbuffer_update(void)
   float t = (timestamp.tv_sec & 0xFF) + timestamp.tv_usec * 1e-6;
 
   struct _backend_uniformbuffer_object ubo = {
-      .resolution = {(float)_backend.swapchain.vk_extent.width, (float)_backend.swapchain.vk_extent.height, 0.0f},
+      .resolution = {(float)_backend.viewport.vk_extent.width, (float)_backend.viewport.vk_extent.height, 0.0f},
       .time = t};
 
   memcpy(mapped_buffer, &ubo, sizeof(ubo));

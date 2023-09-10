@@ -36,7 +36,7 @@ enum prisma_error prisma_ui_init(void)
     if (status != PRISMA_ERROR_NONE)
         return status;
 
-    status = prisma_renderer_init_viewport();
+    status = prisma_renderer_init_ui_viewport();
     if (status != PRISMA_ERROR_NONE)
         return status;
 
@@ -54,7 +54,7 @@ void prisma_ui_draw(void)
 
     prisma_renderer_draw_ui();
 
-    prisma_renderer_draw_viewport();
+    prisma_renderer_draw_ui_viewport();
     
     igRender();
     // igUpdatePlatformWindows();
@@ -63,6 +63,7 @@ void prisma_ui_draw(void)
 
 void prisma_ui_destroy(void)
 {
+    prisma_renderer_destroy_ui_viewport();
     prisma_renderer_destroy_ui();
     prisma_window_destroy_ui();
     igDestroyContext(_ui.imgui_context);
