@@ -26,8 +26,7 @@ enum prisma_error prisma_ui_init(void)
     _ui.imgui_context = igCreateContext(NULL);
     _ui.imgui_io = igGetIO();
     _ui.imgui_io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    // _ui.imgui_io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    
+
     status = primsa_window_init_ui();
     if (status != PRISMA_ERROR_NONE)
         return status;
@@ -45,20 +44,63 @@ enum prisma_error prisma_ui_init(void)
 
 void prisma_ui_draw(void)
 {   
+    ImGuiWindowFlags flags = 0;
+
     prisma_window_refresh_ui();
     prisma_renderer_refresh_ui();
 
     igNewFrame();
 
-    igShowDemoWindow(NULL);
+    flags |= ImGuiWindowFlags_MenuBar;
+    flags |= ImGuiWindowFlags_NoDocking;
+    flags |= ImGuiWindowFlags_NoTitleBar;
+    flags |= ImGuiWindowFlags_NoCollapse;
+    flags |= ImGuiWindowFlags_NoResize;
+    flags |= ImGuiWindowFlags_NoMove;
+    flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
+    flags |= ImGuiWindowFlags_NoNavFocus;
 
-    prisma_renderer_draw_ui();
+    ImGuiViewport *viewport = igGetMainViewport();
+    igSetNextWindowPos(viewport->WorkPos, 0,  (ImVec2) {0, 0});
+    igSetNextWindowSize(viewport->WorkSize, 0);
+    igSetNextWindowViewport(viewport->ID);
+
+    igBegin("Main", NULL, flags);
+
+    ImGuiID dockspace_id = igGetID_Str("DockSpace");
+
+    if (!igDockBuilderGetNode(dockspace_id))
+    {
+        igDockBuilderRemoveNode(dockspace_id);
+        igDockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_None);
+
+        ImGuiID dock_id = dockspace_id;
+        ImGuiID viewport_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Left, 0.5f, NULL, &dock_id);
+        ImGuiID editor_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Up, 0.75f, NULL, &dock_id);
+        ImGuiID log_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Down, 1.0f, NULL, &dock_id);
+
+        igDockBuilderDockWindow("Viewport", viewport_id);
+        igDockBuilderDockWindow("Editor", editor_id);
+        igDockBuilderDockWindow("Log", log_id);
+
+        igDockBuilderFinish(dock_id);
+    }
+
+    igDockSpace(dockspace_id, (ImVec2) {0.0f, 0.0f}, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoWindowMenuButton, NULL);
+
+    igEnd();
+
+    igBegin("Editor", NULL, 0);
+
+    igEnd();
+
+    igBegin("Log", NULL, 0);
+
+    igEnd();
 
     prisma_renderer_draw_ui_viewport();
     
     igRender();
-    // igUpdatePlatformWindows();
-    // igRenderPlatformWindowsDefault(NULL, NULL);
 }
 
 void prisma_ui_destroy(void)

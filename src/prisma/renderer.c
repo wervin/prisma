@@ -179,23 +179,20 @@ struct _backend
   struct _backend_instance instance;
   struct _backend_device device;
   struct _backend_swapchain swapchain;
-  struct _backend_renderpass renderpass;
-  struct _backend_framebuffers framebuffers;
-  struct _backend_commandpool commandpool;
-  struct _backend_commandbuffers commandbuffers;
   struct _backend_sync sync;
+  struct _backend_ui ui;
+  struct _backend_viewport viewport;
+
+/* To refactor */
   struct _backend_shader vertex_shader;
   struct _backend_shader frag_shader;
   struct _backend_descriptorsetlayout descriptorsetlayout;
   struct _backend_pipelinelayout pipelinelayout;
-  struct _backend_pipeline pipeline;
   struct _backend_vertexbuffer vertexbuffer;
   struct _backend_indexbuffer indexbuffer;
   struct _backend_uniformbuffer uniformbuffer;
   struct _backend_descriptorpool descriptorpool;
   struct _backend_descriptorsets descriptorsets;
-  struct _backend_ui ui;
-  struct _backend_viewport viewport;
 };
 
 struct _backend_info
@@ -208,7 +205,6 @@ struct _backend_info
   const char **device_extensions;
   VkSurfaceFormatKHR vk_surface_format;
   VkPresentModeKHR vk_present_mode;
-  uint32_t image_count;
   uint32_t array_layer_count;
   VkSurfaceTransformFlagBitsKHR transform;
   VkSwapchainCreateFlagBitsKHR create_flags;
@@ -278,22 +274,6 @@ static enum prisma_error _backend_swapchain_recreate(void);
 
 static void _backend_swapchain_destroy(void);
 
-static enum prisma_error _backend_renderpass_init(void);
-
-static void _backend_renderpass_destroy(void);
-
-static enum prisma_error _backend_framebuffers_init(void);
-
-static void _backend_framebuffers_destroy(void);
-
-static enum prisma_error _backend_commandpool_init(void);
-
-static void _backend_commandpool_destroy(void);
-
-static enum prisma_error _backend_commandbuffers_init(void);
-
-static void _backend_commandbuffers_destroy(void);
-
 static enum prisma_error _backend_sync_init(void);
 
 static void _backend_sync_destroy(void);
@@ -309,10 +289,6 @@ static void _backend_descriptorsetlayout_destroy(void);
 static enum prisma_error _backend_pipelinelayout_init(void);
 
 static void _backend_pipelinelayout_destroy(void);
-
-static enum prisma_error _backend_pipeline_init(void);
-
-static void _backend_pipeline_destroy(void);
 
 static enum prisma_error _backend_buffer_create(struct _backend_buffer *buffer,
                                                 uint32_t size,
@@ -353,7 +329,8 @@ static struct _backend_info _backend_info = {
     .vertex_shader_path = "default.vert.spv",
     .frag_shader_path = "default.frag.spv",
 
-    .max_frames_in_flight = 2,
+/* Should be equal to image_count */
+    .max_frames_in_flight = 3,
     .features_requested = {
         .samplerAnisotropy = VK_TRUE},
     .vk_surface_format = {.format = VK_FORMAT_B8G8R8A8_SRGB, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR},
@@ -361,7 +338,6 @@ static struct _backend_info _backend_info = {
     .clipped = VK_TRUE,
     .composite_alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     .create_flags = 0,
-    .image_count = 3,
     .image_usage_flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
     .transform = 0,
     .vk_present_mode = VK_PRESENT_MODE_FIFO_KHR,
@@ -389,63 +365,7 @@ enum prisma_error prisma_renderer_init(void)
   if (status != PRISMA_ERROR_NONE)
     return status;
 
-  status = _backend_renderpass_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_framebuffers_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_commandpool_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_commandbuffers_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
   status = _backend_sync_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_shader_init(&_backend.vertex_shader, _backend_info.vertex_shader_path);
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_shader_init(&_backend.frag_shader, _backend_info.frag_shader_path);
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_descriptorsetlayout_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_pipelinelayout_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_pipeline_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_vertexbuffer_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_indexbuffer_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_uniformbuffer_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_descriptorpool_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_descriptorsets_init();
   if (status != PRISMA_ERROR_NONE)
     return status;
 
@@ -457,6 +377,9 @@ enum prisma_error prisma_renderer_draw(void)
   VkResult result = VK_SUCCESS;
 
   _backend.current_frame_in_flight = _backend.frame_count % _backend_info.max_frames_in_flight;
+
+  if (!_backend.viewport.vk_extent.height || !_backend.viewport.vk_extent.width)
+    return PRISMA_ERROR_NONE;
 
   if (vkWaitForFences(_backend.device.vk_device, 1, &_backend.sync.vk_render_fence[_backend.current_frame_in_flight], VK_TRUE, 1000000000) != VK_SUCCESS)
   {
@@ -488,73 +411,6 @@ enum prisma_error prisma_renderer_draw(void)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset render fence");
     return PRISMA_ERROR_VK;
-  }
-
-  /* Render Swapchain */
-  {
-    if (vkResetCommandBuffer(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], 0) != VK_SUCCESS)
-    {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset command buffer");
-      return PRISMA_ERROR_VK;
-    }
-
-    VkCommandBufferBeginInfo commandbufferbegin_info = {0};
-    commandbufferbegin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    commandbufferbegin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    if (vkBeginCommandBuffer(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], &commandbufferbegin_info) != VK_SUCCESS)
-    {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset begin command buffer");
-      return PRISMA_ERROR_VK;
-    }
-
-    VkClearValue clearValue = {0};
-    clearValue.color = (VkClearColorValue){{0.0f, 0.0f, 0.0f, 1.0f}};
-
-    VkRenderPassBeginInfo renderpassbegin_info = {0};
-    renderpassbegin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderpassbegin_info.renderPass = _backend.renderpass.vk_renderpass;
-    renderpassbegin_info.renderArea.offset = (VkOffset2D){.x = 0, .y = 0};
-    renderpassbegin_info.renderArea.extent = _backend.swapchain.vk_extent;
-    renderpassbegin_info.clearValueCount = 1;
-    renderpassbegin_info.pClearValues = &clearValue;
-    renderpassbegin_info.framebuffer = _backend.framebuffers.vk_framebuffers[swapchainImageIndex];
-    vkCmdBeginRenderPass(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], &renderpassbegin_info, VK_SUBPASS_CONTENTS_INLINE);
-
-    vkCmdBindPipeline(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], VK_PIPELINE_BIND_POINT_GRAPHICS, _backend.pipeline.vk_pipeline);
-
-    // VkViewport viewport = {0};
-    // viewport.x = 0.0f;
-    // viewport.y = 0.0f;
-    // viewport.width = (float)_backend.swapchain.vk_extent.width;
-    // viewport.height = (float)_backend.swapchain.vk_extent.height;
-    // viewport.minDepth = 0.0f;
-    // viewport.maxDepth = 1.0f;
-    // vkCmdSetViewport(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], 0, 1, &viewport);
-
-    // VkRect2D scissor = {0};
-    // scissor.offset = (VkOffset2D){.x = 0, .y = 0};
-    // scissor.extent = _backend.swapchain.vk_extent;
-    // vkCmdSetScissor(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], 0, 1, &scissor);
-
-    // VkBuffer vertex_buffers[] = {_backend.vertexbuffer.buffer.vk_buffer};
-    // VkDeviceSize offsets[] = {0};
-    // vkCmdBindVertexBuffers(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], 0, 1, vertex_buffers, offsets);
-
-    // vkCmdBindIndexBuffer(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], _backend.indexbuffer.buffer.vk_buffer, 0, VK_INDEX_TYPE_UINT16);
-
-    // vkCmdBindDescriptorSets(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight],
-    //                         VK_PIPELINE_BIND_POINT_GRAPHICS, _backend.pipelinelayout.vk_pipelinelayout,
-    //                         0, 1, &_backend.descriptorsets.vk_descriptorsets[_backend.current_frame_in_flight], 0, NULL);
-
-    // vkCmdDrawIndexed(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight], _backend.indexbuffer.index_count, 1, 0, 0, 0);
-
-    vkCmdEndRenderPass(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight]);
-
-    if (vkEndCommandBuffer(_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight]) != VK_SUCCESS)
-    {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset end command buffer");
-      return PRISMA_ERROR_VK;
-    }
   }
 
   /* Render View Port */
@@ -668,13 +524,13 @@ enum prisma_error prisma_renderer_draw(void)
   }
 
   /* Present */
-  VkCommandBuffer commandbuffers[3] = {_backend.commandbuffers.vk_commandbuffers[_backend.current_frame_in_flight],
-                                       _backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight],
+  VkCommandBuffer commandbuffers[2] = {_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight],
                                        _backend.ui.vk_commandbuffers[_backend.current_frame_in_flight]};
+
   VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSubmitInfo submit_info = {0};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.commandBufferCount = 3;
+  submit_info.commandBufferCount = 2;
   submit_info.pCommandBuffers = commandbuffers;
   submit_info.pWaitDstStageMask = &waitStage;
   submit_info.waitSemaphoreCount = 1;
@@ -724,13 +580,8 @@ void prisma_renderer_destroy(void)
   _backend_shader_destroy(&_backend.vertex_shader);
   _backend_shader_destroy(&_backend.frag_shader);
   _backend_sync_destroy();
-  _backend_commandbuffers_destroy();
-  _backend_commandpool_destroy();
-  _backend_pipeline_destroy();
   _backend_pipelinelayout_destroy();
   _backend_descriptorsetlayout_destroy();
-  _backend_framebuffers_destroy();
-  _backend_renderpass_destroy();
   _backend_swapchain_destroy();
   _backend_device_destroy();
   _backend_instance_destroy();
@@ -770,11 +621,11 @@ enum prisma_error prisma_renderer_init_ui(void)
   VkAttachmentDescription color_attachment = {0};
   color_attachment.format = _backend_info.vk_surface_format.format;
   color_attachment.samples = _backend_info.sample_count;
-  color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+  color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  color_attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
   VkAttachmentReference color_attachment_ref = {0};
@@ -839,14 +690,14 @@ enum prisma_error prisma_renderer_init_ui(void)
   }
 
   /* Frame Buffers */
-  _backend.ui.vk_framebuffers = malloc(_backend_info.image_count * sizeof(VkFramebuffer));
+  _backend.ui.vk_framebuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkFramebuffer));
   if (_backend.ui.vk_framebuffers == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     VkFramebufferCreateInfo framebuffer_info = {0};
     framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -869,8 +720,8 @@ enum prisma_error prisma_renderer_init_ui(void)
   vulkan_impl_info.PipelineCache = VK_NULL_HANDLE;
   vulkan_impl_info.DescriptorPool = _backend.ui.vk_descriptorpool;
   vulkan_impl_info.Allocator = NULL;
-  vulkan_impl_info.MinImageCount = _backend_info.image_count;
-  vulkan_impl_info.ImageCount = _backend_info.image_count;
+  vulkan_impl_info.MinImageCount = _backend_info.max_frames_in_flight;
+  vulkan_impl_info.ImageCount = _backend_info.max_frames_in_flight;
   vulkan_impl_info.MSAASamples = _backend_info.sample_count;
   if (!ImGui_ImplVulkan_Init(&vulkan_impl_info, _backend.ui.vk_renderpass))
   {
@@ -927,7 +778,7 @@ void prisma_renderer_destroy_ui(void)
 
   if (_backend.ui.vk_framebuffers)
   {
-    for (uint32_t i = 0; i < _backend_info.image_count; i++)
+    for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
     {
       vkDestroyFramebuffer(_backend.device.vk_device, _backend.ui.vk_framebuffers[i], NULL);
     }
@@ -946,6 +797,8 @@ void prisma_renderer_destroy_ui(void)
 
 enum prisma_error prisma_renderer_init_ui_viewport(void)
 {
+  enum prisma_error status = PRISMA_ERROR_NONE;
+
   /* Command Pool */
   VkCommandPoolCreateInfo commandpool_info = {0};
   commandpool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -1002,21 +855,21 @@ enum prisma_error prisma_renderer_init_ui_viewport(void)
   }
 
   /* View Port Images */
-  _backend.viewport.vk_images = malloc(_backend_info.image_count * sizeof(VkImage));
+  _backend.viewport.vk_images = malloc(_backend_info.max_frames_in_flight * sizeof(VkImage));
   if (_backend.viewport.vk_images == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  _backend.viewport.vk_device_memories = malloc(_backend_info.image_count * sizeof(VkDeviceMemory));
+  _backend.viewport.vk_device_memories = malloc(_backend_info.max_frames_in_flight * sizeof(VkDeviceMemory));
   if (_backend.viewport.vk_device_memories == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     VkImageCreateInfo imagecreate_info = {0};
     imagecreate_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1119,14 +972,14 @@ enum prisma_error prisma_renderer_init_ui_viewport(void)
   }
 
   /* View Port Image Views */
-  _backend.viewport.vk_image_views = malloc(_backend_info.image_count * sizeof(VkImageView));
+  _backend.viewport.vk_image_views = malloc(_backend_info.max_frames_in_flight * sizeof(VkImageView));
   if (_backend.viewport.vk_image_views == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     VkImageViewCreateInfo imageview_createinfo = {0};
     imageview_createinfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1192,14 +1045,14 @@ enum prisma_error prisma_renderer_init_ui_viewport(void)
   }
 
   /* Frame Buffers */
-  _backend.viewport.vk_framebuffers = malloc(_backend_info.image_count * sizeof(VkFramebuffer));
+  _backend.viewport.vk_framebuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkFramebuffer));
   if (_backend.viewport.vk_framebuffers == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     VkFramebufferCreateInfo framebuffer_info = {0};
     framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -1211,6 +1064,42 @@ enum prisma_error prisma_renderer_init_ui_viewport(void)
     framebuffer_info.pAttachments = &_backend.viewport.vk_image_views[i];
     vkCreateFramebuffer(_backend.device.vk_device, &framebuffer_info, NULL, &_backend.viewport.vk_framebuffers[i]);
   }
+
+  status = _backend_shader_init(&_backend.vertex_shader, _backend_info.vertex_shader_path);
+  if (status != PRISMA_ERROR_NONE)
+    return status;
+
+  status = _backend_shader_init(&_backend.frag_shader, _backend_info.frag_shader_path);
+  if (status != PRISMA_ERROR_NONE)
+    return status;
+
+  status = _backend_descriptorsetlayout_init();
+  if (status != PRISMA_ERROR_NONE)
+    return status;
+
+  status = _backend_pipelinelayout_init();
+  if (status != PRISMA_ERROR_NONE)
+    return status;
+  
+  status = _backend_vertexbuffer_init();
+  if (status != PRISMA_ERROR_NONE)
+    return status;
+
+  status = _backend_indexbuffer_init();
+  if (status != PRISMA_ERROR_NONE)
+    return status;
+
+  status = _backend_uniformbuffer_init();
+  if (status != PRISMA_ERROR_NONE)
+    return status;
+
+  status = _backend_descriptorpool_init();
+  if (status != PRISMA_ERROR_NONE)
+    return status;
+
+  status = _backend_descriptorsets_init();
+  if (status != PRISMA_ERROR_NONE)
+    return status;
 
   /* Pipeline */
   VkPipelineShaderStageCreateInfo shader_stage_info[2] = {0};
@@ -1356,14 +1245,14 @@ void prisma_renderer_destroy_ui_viewport(void)
 {
   vkDestroySampler(_backend.device.vk_device, _backend.viewport.vk_sampler, NULL);
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     vkDestroyImageView(_backend.device.vk_device, _backend.viewport.vk_image_views[i], NULL);
     vkDestroyImage(_backend.device.vk_device, _backend.viewport.vk_images[i], NULL);
     vkFreeMemory(_backend.device.vk_device, _backend.viewport.vk_device_memories[i], NULL);
   }
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
     vkDestroyFramebuffer(_backend.device.vk_device, _backend.viewport.vk_framebuffers[i], NULL);
 
   vkFreeDescriptorSets(_backend.device.vk_device,
@@ -1881,7 +1770,7 @@ static enum prisma_error _backend_swapchain_init(void)
   swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain_create_info.flags = _backend_info.create_flags;
   swapchain_create_info.surface = _backend.instance.vk_surface;
-  swapchain_create_info.minImageCount = _backend_info.image_count;
+  swapchain_create_info.minImageCount = _backend_info.max_frames_in_flight;
   swapchain_create_info.imageFormat = _backend_info.vk_surface_format.format;
   swapchain_create_info.imageColorSpace = _backend_info.vk_surface_format.colorSpace;
   swapchain_create_info.imageExtent = _backend.swapchain.vk_extent;
@@ -1916,25 +1805,25 @@ static enum prisma_error _backend_swapchain_init(void)
     return PRISMA_ERROR_VK;
   }
 
-  vkGetSwapchainImagesKHR(_backend.device.vk_device, _backend.swapchain.vk_swapchain, &_backend_info.image_count, NULL);
+  vkGetSwapchainImagesKHR(_backend.device.vk_device, _backend.swapchain.vk_swapchain, &_backend_info.max_frames_in_flight, NULL);
 
-  _backend.swapchain.vk_images = malloc(_backend_info.image_count * sizeof(VkImage));
+  _backend.swapchain.vk_images = malloc(_backend_info.max_frames_in_flight * sizeof(VkImage));
   if (_backend.swapchain.vk_images == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  vkGetSwapchainImagesKHR(_backend.device.vk_device, _backend.swapchain.vk_swapchain, &_backend_info.image_count, _backend.swapchain.vk_images);
+  vkGetSwapchainImagesKHR(_backend.device.vk_device, _backend.swapchain.vk_swapchain, &_backend_info.max_frames_in_flight, _backend.swapchain.vk_images);
 
-  _backend.swapchain.vk_image_views = malloc(_backend_info.image_count * sizeof(VkImageView));
+  _backend.swapchain.vk_image_views = malloc(_backend_info.max_frames_in_flight * sizeof(VkImageView));
   if (_backend.swapchain.vk_image_views == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     VkImageViewCreateInfo imageview_createinfo = {0};
     imageview_createinfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -2013,8 +1902,8 @@ static bool _backend_swapchain_check_image_count_support(void)
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_backend.device.vk_physical_device,
                                             _backend.instance.vk_surface,
                                             &capabilities);
-  bool supported_min_image_count = _backend_info.image_count >= capabilities.minImageCount;
-  bool supported_max_image_count = !capabilities.maxImageCount || _backend_info.image_count <= capabilities.maxImageCount;
+  bool supported_min_image_count = _backend_info.max_frames_in_flight >= capabilities.minImageCount;
+  bool supported_max_image_count = !capabilities.maxImageCount || _backend_info.max_frames_in_flight <= capabilities.maxImageCount;
   return supported_max_image_count && supported_min_image_count;
 }
 
@@ -2075,21 +1964,21 @@ static enum prisma_error _backend_swapchain_recreate(void)
 
   if (_backend.viewport.vk_framebuffers)
   {
-    for (uint32_t i = 0; i < _backend_info.image_count; i++)
+    for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
       vkDestroyFramebuffer(_backend.device.vk_device, _backend.viewport.vk_framebuffers[i], NULL);
     free(_backend.viewport.vk_framebuffers);
   }
 
   if (_backend.ui.vk_framebuffers)
   {
-    for (uint32_t i = 0; i < _backend_info.image_count; i++)
+    for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
       vkDestroyFramebuffer(_backend.device.vk_device, _backend.ui.vk_framebuffers[i], NULL);
     free(_backend.ui.vk_framebuffers);
   }
 
-  _backend_framebuffers_destroy();
+  // _backend_framebuffers_destroy();
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     vkDestroyImageView(_backend.device.vk_device, _backend.viewport.vk_image_views[i], NULL);
     vkDestroyImage(_backend.device.vk_device, _backend.viewport.vk_images[i], NULL);
@@ -2109,18 +1998,18 @@ static enum prisma_error _backend_swapchain_recreate(void)
   if (status != PRISMA_ERROR_NONE)
     return status;
 
-  status = _backend_framebuffers_init();
-  if (status != PRISMA_ERROR_NONE)
-    return status;
+  // status = _backend_framebuffers_init();
+  // if (status != PRISMA_ERROR_NONE)
+  //   return status;
 
-  _backend.ui.vk_framebuffers = malloc(_backend_info.image_count * sizeof(VkFramebuffer));
+  _backend.ui.vk_framebuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkFramebuffer));
   if (_backend.ui.vk_framebuffers == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     VkFramebufferCreateInfo framebuffer_info = {0};
     framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -2134,21 +2023,21 @@ static enum prisma_error _backend_swapchain_recreate(void)
   }
 
   /* View Port Images */
-  _backend.viewport.vk_images = malloc(_backend_info.image_count * sizeof(VkImage));
+  _backend.viewport.vk_images = malloc(_backend_info.max_frames_in_flight * sizeof(VkImage));
   if (_backend.viewport.vk_images == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  _backend.viewport.vk_device_memories = malloc(_backend_info.image_count * sizeof(VkDeviceMemory));
+  _backend.viewport.vk_device_memories = malloc(_backend_info.max_frames_in_flight * sizeof(VkDeviceMemory));
   if (_backend.viewport.vk_device_memories == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     VkImageCreateInfo imagecreate_info = {0};
     imagecreate_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -2251,14 +2140,14 @@ static enum prisma_error _backend_swapchain_recreate(void)
   }
 
   /* View Port Image Views */
-  _backend.viewport.vk_image_views = malloc(_backend_info.image_count * sizeof(VkImageView));
+  _backend.viewport.vk_image_views = malloc(_backend_info.max_frames_in_flight * sizeof(VkImageView));
   if (_backend.viewport.vk_image_views == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     VkImageViewCreateInfo imageview_createinfo = {0};
     imageview_createinfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -2281,14 +2170,14 @@ static enum prisma_error _backend_swapchain_recreate(void)
     }
   }
 
-  _backend.viewport.vk_framebuffers = malloc(_backend_info.image_count * sizeof(VkFramebuffer));
+  _backend.viewport.vk_framebuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkFramebuffer));
   if (_backend.viewport.vk_framebuffers == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
+  for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     VkFramebufferCreateInfo framebuffer_info = {0};
     framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -2320,7 +2209,7 @@ static void _backend_swapchain_destroy(void)
 {
   if (_backend.swapchain.vk_image_views)
   {
-    for (uint32_t i = 0; i < _backend_info.image_count; i++)
+    for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
       vkDestroyImageView(_backend.device.vk_device, _backend.swapchain.vk_image_views[i], NULL);
     free(_backend.swapchain.vk_image_views);
   }
@@ -2329,145 +2218,6 @@ static void _backend_swapchain_destroy(void)
     free(_backend.swapchain.vk_images);
 
   vkDestroySwapchainKHR(_backend.device.vk_device, _backend.swapchain.vk_swapchain, NULL);
-}
-
-static enum prisma_error _backend_renderpass_init(void)
-{
-  VkAttachmentDescription color_attachment = {0};
-  color_attachment.format = _backend_info.vk_surface_format.format;
-  color_attachment.samples = _backend_info.sample_count;
-  color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  color_attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentReference color_attachment_ref = {0};
-  color_attachment_ref.attachment = 0;
-  color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkSubpassDescription subpass = {0};
-  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &color_attachment_ref;
-
-  VkSubpassDependency dependency = {0};
-  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-  dependency.dstSubpass = 0;
-  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.srcAccessMask = 0;
-  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-  VkRenderPassCreateInfo render_pass_info = {0};
-  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  render_pass_info.attachmentCount = 1;
-  render_pass_info.pAttachments = &color_attachment;
-  render_pass_info.subpassCount = 1;
-  render_pass_info.pSubpasses = &subpass;
-  render_pass_info.dependencyCount = 1;
-  render_pass_info.pDependencies = &dependency;
-  if (vkCreateRenderPass(_backend.device.vk_device, &render_pass_info, NULL, &_backend.renderpass.vk_renderpass) != VK_SUCCESS)
-  {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create render pass");
-    return PRISMA_ERROR_VK;
-  }
-
-  return PRISMA_ERROR_NONE;
-}
-
-static void _backend_renderpass_destroy(void)
-{
-  vkDestroyRenderPass(_backend.device.vk_device, _backend.renderpass.vk_renderpass, NULL);
-}
-
-static enum prisma_error _backend_framebuffers_init(void)
-{
-  _backend.framebuffers.vk_framebuffers = malloc(_backend_info.image_count * sizeof(VkFramebuffer));
-  if (_backend.framebuffers.vk_framebuffers == NULL)
-  {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
-    return PRISMA_ERROR_MEMORY;
-  }
-
-  for (uint32_t i = 0; i < _backend_info.image_count; i++)
-  {
-    VkFramebufferCreateInfo framebuffer_info = {0};
-    framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebuffer_info.renderPass = _backend.renderpass.vk_renderpass;
-    framebuffer_info.attachmentCount = 1;
-    framebuffer_info.width = _backend.swapchain.vk_extent.width;
-    framebuffer_info.height = _backend.swapchain.vk_extent.height;
-    framebuffer_info.layers = 1;
-    framebuffer_info.pAttachments = &_backend.swapchain.vk_image_views[i];
-    vkCreateFramebuffer(_backend.device.vk_device, &framebuffer_info, NULL, &_backend.framebuffers.vk_framebuffers[i]);
-  }
-  return PRISMA_ERROR_NONE;
-}
-
-static void _backend_framebuffers_destroy(void)
-{
-  if (_backend.framebuffers.vk_framebuffers)
-  {
-    for (uint32_t i = 0; i < _backend_info.image_count; i++)
-    {
-      vkDestroyFramebuffer(_backend.device.vk_device, _backend.framebuffers.vk_framebuffers[i], NULL);
-    }
-    free(_backend.framebuffers.vk_framebuffers);
-  }
-}
-
-static enum prisma_error _backend_commandpool_init(void)
-{
-  VkCommandPoolCreateInfo commandpool_info = {0};
-  commandpool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  commandpool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  commandpool_info.queueFamilyIndex = _backend.device.vk_graphic_queue_index;
-  if (vkCreateCommandPool(_backend.device.vk_device, &commandpool_info, NULL, &_backend.commandpool.vk_commandpool) != VK_SUCCESS)
-  {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create command pool");
-    return PRISMA_ERROR_VK;
-  }
-
-  return PRISMA_ERROR_NONE;
-}
-
-static void _backend_commandpool_destroy(void)
-{
-  vkDestroyCommandPool(_backend.device.vk_device, _backend.commandpool.vk_commandpool, NULL);
-}
-
-static enum prisma_error _backend_commandbuffers_init(void)
-{
-  _backend.commandbuffers.vk_commandbuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkCommandBuffer));
-  if (_backend.commandbuffers.vk_commandbuffers == NULL)
-  {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
-    return PRISMA_ERROR_MEMORY;
-  }
-
-  VkCommandBufferAllocateInfo commandbuffers_info = {0};
-  commandbuffers_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  commandbuffers_info.commandPool = _backend.commandpool.vk_commandpool;
-  commandbuffers_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  commandbuffers_info.commandBufferCount = _backend_info.max_frames_in_flight;
-  if (vkAllocateCommandBuffers(_backend.device.vk_device, &commandbuffers_info, _backend.commandbuffers.vk_commandbuffers) != VK_SUCCESS)
-  {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create command buffer");
-    return PRISMA_ERROR_VK;
-  }
-
-  return PRISMA_ERROR_NONE;
-}
-
-static void _backend_commandbuffers_destroy(void)
-{
-  if (_backend.commandbuffers.vk_commandbuffers)
-  {
-    vkFreeCommandBuffers(_backend.device.vk_device, _backend.commandpool.vk_commandpool, _backend_info.max_frames_in_flight, _backend.commandbuffers.vk_commandbuffers);
-    free(_backend.commandbuffers.vk_commandbuffers);
-  }
 }
 
 static enum prisma_error _backend_sync_init(void)
@@ -2630,111 +2380,6 @@ static void _backend_pipelinelayout_destroy(void)
   vkDestroyPipelineLayout(_backend.device.vk_device, _backend.pipelinelayout.vk_pipelinelayout, NULL);
 }
 
-static enum prisma_error _backend_pipeline_init(void)
-{
-  VkPipelineShaderStageCreateInfo shader_stage_info[2] = {0};
-  shader_stage_info[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  shader_stage_info[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  shader_stage_info[0].module = _backend.vertex_shader.vk_shader_module;
-  shader_stage_info[0].pName = "main";
-
-  shader_stage_info[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  shader_stage_info[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  shader_stage_info[1].module = _backend.frag_shader.vk_shader_module;
-  shader_stage_info[1].pName = "main";
-
-  struct _backend_vertex2d_model_input _backend_vertex2d_model_input = {
-      .attributes = {
-          {.binding = 0,
-           .location = 0,
-           .format = VK_FORMAT_R32G32_SFLOAT,
-           .offset = offsetof(struct _backend_vertex2d_model, position)}},
-      .binding = {.binding = 0, .stride = sizeof(struct _backend_vertex2d_model), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX}};
-
-  VkPipelineVertexInputStateCreateInfo vertex_input_info = {0};
-  vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-  vertex_input_info.vertexBindingDescriptionCount = 1;
-  vertex_input_info.vertexAttributeDescriptionCount = 1;
-  vertex_input_info.pVertexBindingDescriptions = &_backend_vertex2d_model_input.binding;
-  vertex_input_info.pVertexAttributeDescriptions = _backend_vertex2d_model_input.attributes;
-
-  VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {0};
-  input_assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  input_assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-  input_assembly_info.primitiveRestartEnable = VK_FALSE;
-
-  VkPipelineViewportStateCreateInfo viewportstate_info = {0};
-  viewportstate_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-  viewportstate_info.viewportCount = 1;
-  viewportstate_info.pViewports = NULL;
-  viewportstate_info.scissorCount = 1;
-  viewportstate_info.pScissors = NULL;
-
-  VkPipelineRasterizationStateCreateInfo rasterization_info = {0};
-  rasterization_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterization_info.depthClampEnable = VK_FALSE;
-  rasterization_info.rasterizerDiscardEnable = VK_FALSE;
-  rasterization_info.polygonMode = VK_POLYGON_MODE_FILL;
-  rasterization_info.lineWidth = 1.0f;
-  rasterization_info.cullMode = VK_CULL_MODE_NONE;
-  rasterization_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
-  rasterization_info.depthBiasEnable = VK_FALSE;
-
-  VkPipelineMultisampleStateCreateInfo multisampling_info = {0};
-  multisampling_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-  multisampling_info.sampleShadingEnable = VK_FALSE;
-  multisampling_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-  VkPipelineColorBlendAttachmentState colorblend_attachment_info = {0};
-  colorblend_attachment_info.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-  colorblend_attachment_info.blendEnable = VK_FALSE;
-
-  VkPipelineColorBlendStateCreateInfo colorblending_info = {0};
-  colorblending_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-  colorblending_info.logicOpEnable = VK_FALSE;
-  colorblending_info.logicOp = VK_LOGIC_OP_COPY;
-  colorblending_info.attachmentCount = 1;
-  colorblending_info.pAttachments = &colorblend_attachment_info;
-  colorblending_info.blendConstants[0] = 0.0f;
-  colorblending_info.blendConstants[1] = 0.0f;
-  colorblending_info.blendConstants[2] = 0.0f;
-  colorblending_info.blendConstants[3] = 0.0f;
-
-  VkDynamicState dynamic_states[2] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-  VkPipelineDynamicStateCreateInfo dynamicstate_info = {0};
-  dynamicstate_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-  dynamicstate_info.dynamicStateCount = 2;
-  dynamicstate_info.pDynamicStates = dynamic_states;
-
-  VkGraphicsPipelineCreateInfo pipeline_info = {0};
-  pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-  pipeline_info.stageCount = 2;
-  pipeline_info.pStages = shader_stage_info;
-  pipeline_info.pVertexInputState = &vertex_input_info;
-  pipeline_info.pInputAssemblyState = &input_assembly_info;
-  pipeline_info.pViewportState = &viewportstate_info;
-  pipeline_info.pRasterizationState = &rasterization_info;
-  pipeline_info.pMultisampleState = &multisampling_info;
-  pipeline_info.pColorBlendState = &colorblending_info;
-  pipeline_info.pDynamicState = &dynamicstate_info;
-  pipeline_info.layout = _backend.pipelinelayout.vk_pipelinelayout;
-  pipeline_info.renderPass = _backend.renderpass.vk_renderpass;
-  pipeline_info.subpass = 0;
-  pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
-  if (vkCreateGraphicsPipelines(_backend.device.vk_device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &_backend.pipeline.vk_pipeline) != VK_SUCCESS)
-  {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create pipeline");
-    return PRISMA_ERROR_VK;
-  }
-
-  return PRISMA_ERROR_NONE;
-}
-
-static void _backend_pipeline_destroy(void)
-{
-  vkDestroyPipeline(_backend.device.vk_device, _backend.pipeline.vk_pipeline, NULL);
-}
-
 static enum prisma_error _backend_buffer_create(struct _backend_buffer *buffer,
                                                 uint32_t size,
                                                 VkBufferUsageFlags usage,
@@ -2788,7 +2433,7 @@ static enum prisma_error _backend_buffer_copy(struct _backend_buffer *source,
   VkCommandBufferAllocateInfo allocInfo = {0};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandPool = _backend.commandpool.vk_commandpool;
+  allocInfo.commandPool = _backend.viewport.vk_commandpool;
   allocInfo.commandBufferCount = 1;
 
   VkCommandBuffer commandbuffer;
@@ -2813,7 +2458,7 @@ static enum prisma_error _backend_buffer_copy(struct _backend_buffer *source,
 
   vkQueueSubmit(_backend.device.vk_graphic_queue, 1, &submitInfo, VK_NULL_HANDLE);
   vkQueueWaitIdle(_backend.device.vk_graphic_queue);
-  vkFreeCommandBuffers(_backend.device.vk_device, _backend.commandpool.vk_commandpool, 1, &commandbuffer);
+  vkFreeCommandBuffers(_backend.device.vk_device, _backend.viewport.vk_commandpool, 1, &commandbuffer);
 
   return PRISMA_ERROR_NONE;
 }
