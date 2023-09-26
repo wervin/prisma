@@ -329,7 +329,6 @@ static struct _backend_info _backend_info = {
     .vertex_shader_path = "default.vert.spv",
     .frag_shader_path = "default.frag.spv",
 
-/* Should be equal to image_count */
     .max_frames_in_flight = 3,
     .features_requested = {
         .samplerAnisotropy = VK_TRUE},
