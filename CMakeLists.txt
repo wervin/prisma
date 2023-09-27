@@ -39,9 +39,11 @@ target_compile_definitions(prisma PRIVATE
     IMGUI_IMPL_API=\ )
 
 add_custom_target(default.vert.spv
+    DEPENDS ${CMAKE_SOURCE_DIR}/shaders/default.vert
     COMMAND glslangValidator --quiet -V ${CMAKE_SOURCE_DIR}/shaders/default.vert -o ${CMAKE_BINARY_DIR}/default.vert.spv)
 
 add_custom_target(default.frag.spv
+    DEPENDS ${CMAKE_SOURCE_DIR}/shaders/default.frag
     COMMAND glslangValidator --quiet -V ${CMAKE_SOURCE_DIR}/shaders/default.frag -o ${CMAKE_BINARY_DIR}/default.frag.spv)
 
 add_dependencies(prisma
