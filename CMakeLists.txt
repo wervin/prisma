@@ -2,9 +2,12 @@ cmake_minimum_required(VERSION 3.14)
 
 project(prisma)
 
+include(ExternalProject)
+
 add_subdirectory(externals/cglm)
 add_subdirectory(externals/cimgui)
 add_subdirectory(externals/glslang)
+add_subdirectory(externals/poulpe)
 add_subdirectory(externals/sake)
 
 set(PRISMA_SOURCES
@@ -23,7 +26,7 @@ target_link_libraries(prisma
     cglm
     glslang
     sake
-    cimgui_core
+    cimgui
     /usr/lib/x86_64-linux-gnu/libvulkan.so
     /usr/lib/x86_64-linux-gnu/libglfw.so)
 
@@ -36,7 +39,11 @@ target_compile_options(prisma PRIVATE
     -Wall -Wextra -Wpedantic)
 
 target_compile_definitions(prisma PRIVATE 
-    IMGUI_IMPL_API=\ )
+    CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+    GLFW_INCLUDE_VULKAN
+    CIMGUI_USE_GLFW
+    CIMGUI_USE_VULKAN
+)
 
 add_custom_target(default.vert.spv
     DEPENDS ${CMAKE_SOURCE_DIR}/shaders/default.vert

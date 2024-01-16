@@ -1,51 +1,56 @@
-include(FetchContent)
-
-FetchContent_Declare(
-    cimgui
+ExternalProject_Add(
+    cimgui-external
     GIT_REPOSITORY https://github.com/cimgui/cimgui.git
-    GIT_TAG 1.89.8dock
+    GIT_TAG 1.90dock
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ""
+    INSTALL_COMMAND ""
 )
 
-FetchContent_GetProperties(cimgui)
+ExternalProject_Get_property(cimgui-external SOURCE_DIR)
 
-if(NOT ${cimgui_POPULATED})
-    FetchContent_Populate(cimgui)
-    message("remove default cimgui_impl.h")
-    file(REMOVE ${cimgui_SOURCE_DIR}/generator/output/cimgui_impl.h)
-endif()
-
-add_custom_command(
-    OUTPUT ${cimgui_SOURCE_DIR}/generator/output/cimgui_impl.h
-    COMMAND luajit ./generator.lua gcc "internal" glfw vulkan
-    WORKING_DIRECTORY ${cimgui_SOURCE_DIR}/generator
+set(CIMGUI_SOURCES 
+    ${SOURCE_DIR}/cimgui.cpp
+    ${SOURCE_DIR}/imgui/imgui.cpp
+    ${SOURCE_DIR}/imgui/imgui_draw.cpp
+    ${SOURCE_DIR}/imgui/imgui_demo.cpp
+    ${SOURCE_DIR}/imgui/imgui_tables.cpp
+    ${SOURCE_DIR}/imgui/imgui_widgets.cpp
+    ${SOURCE_DIR}/imgui/backends/imgui_impl_vulkan.cpp
+    ${SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp
 )
 
-add_custom_target(cimgui_backend
-    DEPENDS ${cimgui_SOURCE_DIR}/generator/output/cimgui_impl.h
+ExternalProject_Add_Step(
+    cimgui-external
+    fetch
+    DEPENDEES download
+    BYPRODUCTS ${CIMGUI_SOURCES}
 )
 
-add_library(cimgui_core STATIC
-    ${cimgui_SOURCE_DIR}/cimgui.cpp
-    ${cimgui_SOURCE_DIR}/imgui/imgui.cpp
-    ${cimgui_SOURCE_DIR}/imgui/imgui_draw.cpp
-    ${cimgui_SOURCE_DIR}/imgui/imgui_demo.cpp
-    ${cimgui_SOURCE_DIR}/imgui/imgui_tables.cpp
-    ${cimgui_SOURCE_DIR}/imgui/imgui_widgets.cpp
-    ${cimgui_SOURCE_DIR}/imgui/backends/imgui_impl_vulkan.cpp
-    ${cimgui_SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp
+ExternalProject_Add_Step(
+    cimgui-external
+    bootstrap
+    COMMAND ./generator.sh -t "internal noimstrv" -c "glfw vulkan"
+    DEPENDEES download
+    WORKING_DIRECTORY ${SOURCE_DIR}/generator
+    BYPRODUCTS 
+        ${SOURCE_DIR}/generator/output/cimgui_impl.h
+        ${SOURCE_DIR}/cimgui.cpp
+        ${SOURCE_DIR}/cimgui.h
 )
 
-add_dependencies(cimgui_core 
-    cimgui_backend
+add_library(cimgui STATIC ${CIMGUI_SOURCES})
+add_dependencies(cimgui cimgui-external)
+
+target_include_directories(cimgui PUBLIC
+  ${SOURCE_DIR}
+  ${SOURCE_DIR}/generator/output
+  ${SOURCE_DIR}/imgui
+  ${SOURCE_DIR}/imgui/backends
 )
 
-target_include_directories(cimgui_core PUBLIC
-  ${cimgui_SOURCE_DIR}
-  ${cimgui_SOURCE_DIR}/generator/output
-  ${cimgui_SOURCE_DIR}/imgui
-  ${cimgui_SOURCE_DIR}/imgui/backends
-)
-
-target_compile_definitions(cimgui_core PRIVATE 
+target_compile_definitions(cimgui PRIVATE 
     IMGUI_IMPL_API=extern\ \"C\"
+    IMGUI_DISABLE_OBSOLETE_KEYIO
+    IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 )
