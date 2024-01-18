@@ -8,6 +8,7 @@
 
 #define PRISMA_LOG_INFO(...) prisma_log(stdout, PRISMA_LOG_LEVEL_INFO, __FILE__, __LINE__, __func__, __VA_ARGS__)
 #define PRISMA_LOG_ERROR(error, msg) prisma_log(stderr, PRISMA_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__, "[%s] %s\n", prisma_error_str(error), msg)
+#define PRISMA_LOG_ERROR_INFO(...) prisma_log(stderr, PRISMA_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__, __VA_ARGS__)
 
 #ifdef NDEBUG
 #define PRISMA_LOG_DEBUG(...)

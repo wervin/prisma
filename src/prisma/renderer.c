@@ -12,6 +12,9 @@
 #include <cimgui.h>
 #include <cimgui_impl.h>
 
+#include <glslang/Include/glslang_c_interface.h>
+#include <glslang/Public/resource_limits_c.h>
+
 #include <sake/macro.h>
 
 #include "prisma/window.h"
@@ -274,7 +277,7 @@ static enum prisma_error _backend_sync_init(void);
 
 static void _backend_sync_destroy(void);
 
-static enum prisma_error _backend_shader_init(struct _backend_shader *shader, const char *path);
+static enum prisma_error _backend_shader_init(struct _backend_shader *shader, glslang_stage_t stage, const char *path);
 
 static void _backend_shader_destroy(struct _backend_shader *shader);
 
@@ -322,8 +325,8 @@ static void _backend_descriptorsets_destroy(void);
 static struct _backend _backend = {0};
 
 static struct _backend_info _backend_info = {
-    .vertex_shader_path = "default.vert.spv",
-    .frag_shader_path = "default.frag.spv",
+    .vertex_shader_path = "shaders/default.vert",
+    .frag_shader_path = "shaders/default.frag",
 
     .max_frames_in_flight = 3,
     .features_requested = {
@@ -1032,11 +1035,11 @@ enum prisma_error prisma_renderer_init_ui_viewport(void)
     vkCreateFramebuffer(_backend.device.vk_device, &framebuffer_info, NULL, &_backend.viewport.vk_framebuffers[i]);
   }
 
-  status = _backend_shader_init(&_backend.vertex_shader, _backend_info.vertex_shader_path);
+  status = _backend_shader_init(&_backend.vertex_shader, GLSLANG_STAGE_VERTEX, _backend_info.vertex_shader_path);
   if (status != PRISMA_ERROR_NONE)
     return status;
 
-  status = _backend_shader_init(&_backend.frag_shader, _backend_info.frag_shader_path);
+  status = _backend_shader_init(&_backend.frag_shader, GLSLANG_STAGE_FRAGMENT, _backend_info.frag_shader_path);
   if (status != PRISMA_ERROR_NONE)
     return status;
 
@@ -2249,7 +2252,7 @@ static void _backend_sync_destroy(void)
   }
 }
 
-static enum prisma_error _backend_shader_init(struct _backend_shader *shader, const char *path)
+static enum prisma_error _backend_shader_init(struct _backend_shader *shader, glslang_stage_t stage, const char *path)
 {
   uint32_t size;
   uint8_t *buffer;
@@ -2275,18 +2278,86 @@ static enum prisma_error _backend_shader_init(struct _backend_shader *shader, co
   fread(buffer, 1, size, fd);
   fclose(fd);
 
+  glslang_initialize_process();
+
+  const glslang_input_t glsl_input = {
+      .language = GLSLANG_SOURCE_GLSL,
+      .stage = stage,
+      .client = GLSLANG_CLIENT_VULKAN,
+      .client_version = GLSLANG_TARGET_VULKAN_1_0,
+      .target_language = GLSLANG_TARGET_SPV,
+      .target_language_version = GLSLANG_TARGET_SPV_1_0,
+      .code = (const char *)buffer,
+      .default_version = 100,
+      .default_profile = GLSLANG_NO_PROFILE,
+      .force_default_version_and_profile = false,
+      .forward_compatible = false,
+      .messages = GLSLANG_MSG_DEFAULT_BIT,
+      .resource = glslang_default_resource(),
+  };
+
+  glslang_shader_t* glsl_shader = glslang_shader_create(&glsl_input);
+
+  if (!glslang_shader_preprocess(glsl_shader, &glsl_input))
+  {
+    PRISMA_LOG_ERROR(PRISMA_ERROR_GLSL, "GLSL preprocessing failed");
+    PRISMA_LOG_ERROR_INFO("%s\n", path);
+    PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_info_log(glsl_shader));
+    PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_info_debug_log(glsl_shader));
+    PRISMA_LOG_ERROR_INFO("%s\n", glsl_input.code);
+    glslang_shader_delete(glsl_shader);
+    glslang_finalize_process();
+    free(buffer);
+    return PRISMA_ERROR_GLSL;
+  }
+
+  free(buffer);
+
+  if (!glslang_shader_parse(glsl_shader, &glsl_input))
+  {
+    PRISMA_LOG_ERROR(PRISMA_ERROR_GLSL, "GLSL parsing failed");
+    PRISMA_LOG_ERROR_INFO("%s\n", path);
+    PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_info_log(glsl_shader));
+    PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_info_debug_log(glsl_shader));
+    PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_preprocessed_code(glsl_shader));
+    glslang_shader_delete(glsl_shader);
+    glslang_finalize_process();
+    return PRISMA_ERROR_GLSL;
+  }
+
+  glslang_program_t *glsl_program = glslang_program_create();
+  glslang_program_add_shader(glsl_program, glsl_shader);
+
+  if (!glslang_program_link(glsl_program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT))
+  {
+    PRISMA_LOG_ERROR(PRISMA_ERROR_GLSL, "GLSL linking failed");
+    PRISMA_LOG_ERROR_INFO("%s\n", path);
+    PRISMA_LOG_ERROR_INFO("%s\n", glslang_program_get_info_log(glsl_program));
+    PRISMA_LOG_ERROR_INFO("%s\n", glslang_program_get_info_debug_log(glsl_program));
+    glslang_program_delete(glsl_program);
+    glslang_shader_delete(glsl_shader);
+    glslang_finalize_process();
+    return PRISMA_ERROR_GLSL;
+  }
+
+  glslang_program_SPIRV_generate(glsl_program, stage);
+
+  glslang_shader_delete(glsl_shader);
+
   VkShaderModuleCreateInfo create_info = {0};
   create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  create_info.codeSize = size;
-  create_info.pCode = (uint32_t *)buffer;
+  create_info.codeSize = glslang_program_SPIRV_get_size(glsl_program) * sizeof(uint32_t);
+  create_info.pCode = glslang_program_SPIRV_get_ptr(glsl_program);
   if (vkCreateShaderModule(_backend.device.vk_device, &create_info, NULL, &shader->vk_shader_module) != VK_SUCCESS)
   {
-    free(buffer);
+    glslang_program_delete(glsl_program);
+    glslang_finalize_process();
     PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create shader module");
     return PRISMA_ERROR_VK;
   }
 
-  free(buffer);
+  glslang_program_delete(glsl_program);
+  glslang_finalize_process();
   return PRISMA_ERROR_NONE;
 }
 

@@ -61,6 +61,16 @@ void prisma_ui_draw(void)
     igSetNextWindowSize(viewport->WorkSize, 0);
     igSetNextWindowViewport(viewport->ID);
 
+    ImGuiStyle *style = igGetStyle();
+
+    igPushStyleColor_Vec4(ImGuiCol_TitleBgActive, (ImVec4){0, 0, 0, 0});
+    igPushStyleColor_Vec4(ImGuiCol_Tab, style->Colors[ImGuiCol_TabUnfocused]);
+    igPushStyleColor_Vec4(ImGuiCol_TabHovered, style->Colors[ImGuiCol_TabHovered]);
+    igPushStyleColor_Vec4(ImGuiCol_TabActive, style->Colors[ImGuiCol_TabUnfocusedActive]);
+    igPushStyleColor_Vec4(ImGuiCol_TabUnfocused, style->Colors[ImGuiCol_TabUnfocused]);
+    igPushStyleColor_Vec4(ImGuiCol_TabUnfocusedActive, style->Colors[ImGuiCol_TabUnfocused]);
+    igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, (ImVec2){0.f, 0.f});
+
     igBegin("Main", NULL, flags);
 
     ImGuiID dockspace_id = igGetID_Str("DockSpace");
@@ -71,20 +81,18 @@ void prisma_ui_draw(void)
         igDockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_None);
 
         ImGuiID dock_id = dockspace_id;
-        ImGuiID viewport_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Left, 0.5f, NULL, &dock_id);
-        ImGuiID editor_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Up, 0.75f, NULL, &dock_id);
-        ImGuiID log_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Down, 1.0f, NULL, &dock_id);
+        ImGuiID editor_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Left, 0.4f, NULL, &dock_id);
+        ImGuiID log_id = igDockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.25f, NULL, &editor_id);
+        ImGuiID viewport_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Right, 0.6f, NULL, &dock_id);
 
-        igDockBuilderDockWindow("Viewport", viewport_id);
         igDockBuilderDockWindow("Editor", editor_id);
         igDockBuilderDockWindow("Log", log_id);
+        igDockBuilderDockWindow("Viewport", viewport_id);
 
         igDockBuilderFinish(dock_id);
     }
 
     igDockSpace(dockspace_id, (ImVec2) {0.0f, 0.0f}, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoWindowMenuButton, NULL);
-
-    igEnd();
 
     igBegin("Editor", NULL, 0);
 
@@ -95,6 +103,11 @@ void prisma_ui_draw(void)
     igEnd();
 
     prisma_renderer_draw_ui_viewport();
+
+    igEnd();
+    
+    igPopStyleVar(1);
+    igPopStyleColor(6);
     
     igRender();
 }
