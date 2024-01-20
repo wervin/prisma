@@ -765,7 +765,7 @@ void prisma_renderer_destroy_ui(void)
   vkDestroyRenderPass(_backend.device.vk_device, _backend.ui.vk_renderpass, NULL);
 }
 
-enum prisma_error prisma_renderer_init_ui_viewport(void)
+enum prisma_error prisma_renderer_init_viewport(void)
 {
   enum prisma_error status = PRISMA_ERROR_NONE;
 
@@ -1183,35 +1183,30 @@ enum prisma_error prisma_renderer_init_ui_viewport(void)
   return PRISMA_ERROR_NONE;
 }
 
-void prisma_renderer_draw_ui_viewport(void)
+void prisma_renderer_draw_viewport(void)
 {
-  igBegin("Viewport", NULL, 0);
-
   ImVec2 viewport = {0};
   igGetContentRegionAvail(&viewport);
 
   if (viewport.x <= 0 || viewport.y <= 0)
-    goto end;
+    return;
 
   if (viewport.x != _backend.viewport.vk_extent.width || viewport.y != _backend.viewport.vk_extent.height)
   {
-    _backend.viewport.vk_extent = (VkExtent2D) { .width=viewport.x, .height=viewport.y };
+    _backend.viewport.vk_extent = (VkExtent2D){.width = viewport.x, .height = viewport.y};
     _backend_swapchain_recreate();
-    goto end;
+    return;
   }
 
   igImage(_backend.viewport.vk_descriptorsets[_backend.current_frame_in_flight],
-          (ImVec2) {_backend.viewport.vk_extent.width, _backend.viewport.vk_extent.height},
-          (ImVec2) {0, 0},
-          (ImVec2) {1, 1},
-          (ImVec4) {1, 1, 1, 1},
-          (ImVec4) {0, 0, 0, 0});
-
-end:
-  igEnd();
+          (ImVec2){_backend.viewport.vk_extent.width, _backend.viewport.vk_extent.height},
+          (ImVec2){0, 0},
+          (ImVec2){1, 1},
+          (ImVec4){1, 1, 1, 1},
+          (ImVec4){0, 0, 0, 0});
 }
 
-void prisma_renderer_destroy_ui_viewport(void)
+void prisma_renderer_destroy_viewport(void)
 {
   vkDestroySampler(_backend.device.vk_device, _backend.viewport.vk_sampler, NULL);
 

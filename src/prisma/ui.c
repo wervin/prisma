@@ -7,21 +7,27 @@
 #include "prisma/renderer.h"
 #include "prisma/window.h"
 
-struct _ui
-{
-    ImGuiContext *imgui_context;
-    ImGuiIO *imgui_io;
+#include "prisma/components/editor.h"
+#include "prisma/components/logger.h"
+#include "prisma/components/menu.h"
+#include "prisma/components/viewport.h"
+
+struct ui {
+    struct prisma_editor *editor;
+    struct prisma_logger *logger;
+    struct prisma_menu *menu;
+    struct prisma_viewport *viewport;
 };
 
-static struct _ui _ui = {0};
+static struct ui _ui = {0};
 
 enum prisma_error prisma_ui_init(void)
 {
     enum prisma_error status = PRISMA_ERROR_NONE;
 
-    _ui.imgui_context = igCreateContext(NULL);
-    _ui.imgui_io = igGetIO();
-    _ui.imgui_io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    igCreateContext(NULL);
+    ImGuiIO * io = igGetIO();
+    io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     status = primsa_window_init_ui();
     if (status != PRISMA_ERROR_NONE)
@@ -31,23 +37,33 @@ enum prisma_error prisma_ui_init(void)
     if (status != PRISMA_ERROR_NONE)
         return status;
 
-    status = prisma_renderer_init_ui_viewport();
-    if (status != PRISMA_ERROR_NONE)
-        return status;
+    _ui.editor = (struct prisma_editor *) prisma_component_new(PRISMA_COMPONENT_TYPE_EDITOR);
+    if (!_ui.editor)
+        return PRISMA_ERROR_MEMORY;
+
+    _ui.logger = (struct prisma_logger *)  prisma_component_new(PRISMA_COMPONENT_TYPE_LOGGER);
+    if (!_ui.logger)
+        return PRISMA_ERROR_MEMORY;
+
+    _ui.menu = (struct prisma_menu *)  prisma_component_new(PRISMA_COMPONENT_TYPE_MENU);
+    if (!_ui.menu)
+        return PRISMA_ERROR_MEMORY;
+
+    _ui.viewport = (struct prisma_viewport *)  prisma_component_new(PRISMA_COMPONENT_TYPE_VIEWPORT);
+    if (!_ui.viewport)
+        return PRISMA_ERROR_MEMORY;
 
     return PRISMA_ERROR_NONE;
 }
 
 void prisma_ui_draw(void)
 {   
-    ImGuiWindowFlags flags = 0;
-
     prisma_window_refresh_ui();
     prisma_renderer_refresh_ui();
 
     igNewFrame();
 
-    flags |= ImGuiWindowFlags_MenuBar;
+    ImGuiWindowFlags flags = 0;
     flags |= ImGuiWindowFlags_NoDocking;
     flags |= ImGuiWindowFlags_NoTitleBar;
     flags |= ImGuiWindowFlags_NoCollapse;
@@ -94,15 +110,19 @@ void prisma_ui_draw(void)
 
     igDockSpace(dockspace_id, (ImVec2) {0.0f, 0.0f}, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoWindowMenuButton, NULL);
 
+    prisma_component_draw((struct prisma_component *) _ui.menu);
+  
     igBegin("Editor", NULL, 0);
-
+    prisma_component_draw((struct prisma_component *) _ui.editor);
     igEnd();
 
     igBegin("Log", NULL, 0);
-
+    prisma_component_draw((struct prisma_component *) _ui.logger);
     igEnd();
 
-    prisma_renderer_draw_ui_viewport();
+    igBegin("Viewport", NULL, 0);
+    prisma_component_draw((struct prisma_component *) _ui.viewport);
+    igEnd();
 
     igEnd();
     
@@ -114,8 +134,17 @@ void prisma_ui_draw(void)
 
 void prisma_ui_destroy(void)
 {
-    prisma_renderer_destroy_ui_viewport();
+    if (_ui.editor)
+        prisma_component_free((struct prisma_component *) _ui.editor);
+    if (_ui.logger)
+        prisma_component_free((struct prisma_component *) _ui.logger);
+    if (_ui.menu)
+        prisma_component_free((struct prisma_component *) _ui.menu);
+    if (_ui.viewport)
+        prisma_component_free((struct prisma_component *) _ui.viewport);
+    
     prisma_renderer_destroy_ui();
     prisma_window_destroy_ui();
-    igDestroyContext(_ui.imgui_context);
+    ImGuiContext *context = igGetCurrentContext();
+    igDestroyContext(context);
 }
