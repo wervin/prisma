@@ -5,6 +5,7 @@
 
 #include "prisma/ui.h"
 #include "prisma/renderer.h"
+#include "prisma/style.h"
 #include "prisma/window.h"
 
 #include "prisma/components/editor.h"
@@ -12,22 +13,17 @@
 #include "prisma/components/menu.h"
 #include "prisma/components/viewport.h"
 
-struct ui {
-    struct prisma_editor *editor;
-    struct prisma_logger *logger;
-    struct prisma_menu *menu;
-    struct prisma_viewport *viewport;
-};
+static struct prisma_ui _ui = {0};
 
-static struct ui _ui = {0};
+static void _init_imgui(void);
 
 enum prisma_error prisma_ui_init(void)
 {
     enum prisma_error status = PRISMA_ERROR_NONE;
 
-    igCreateContext(NULL);
-    ImGuiIO * io = igGetIO();
-    io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    _init_imgui();
+    
+    prisma_style_init();
 
     status = primsa_window_init_ui();
     if (status != PRISMA_ERROR_NONE)
@@ -52,6 +48,11 @@ enum prisma_error prisma_ui_init(void)
     _ui.viewport = (struct prisma_viewport *)  prisma_component_new(PRISMA_COMPONENT_TYPE_VIEWPORT);
     if (!_ui.viewport)
         return PRISMA_ERROR_MEMORY;
+
+    prisma_editor_set_ui(_ui.editor, &_ui);
+    prisma_logger_set_ui(_ui.logger, &_ui);
+    prisma_menu_set_ui(_ui.menu, &_ui);
+    prisma_viewport_set_ui(_ui.viewport, &_ui);
 
     return PRISMA_ERROR_NONE;
 }
@@ -147,4 +148,11 @@ void prisma_ui_destroy(void)
     prisma_window_destroy_ui();
     ImGuiContext *context = igGetCurrentContext();
     igDestroyContext(context);
+}
+
+static void _init_imgui(void)
+{
+    igCreateContext(NULL);
+    ImGuiIO * io = igGetIO();
+    io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 }

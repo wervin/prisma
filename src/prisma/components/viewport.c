@@ -40,3 +40,8 @@ enum prisma_error prisma_viewport_draw(struct prisma_viewport *viewport)
     prisma_renderer_draw_viewport();
     return PRISMA_ERROR_NONE;
 }
+
+void prisma_viewport_set_ui(struct prisma_viewport *viewport, struct prisma_ui *ui)
+{
+    viewport->ui = ui;
+}

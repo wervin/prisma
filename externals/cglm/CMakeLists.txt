@@ -1,3 +1,5 @@
+include(ExternalProject)
+
 ExternalProject_Add(
     cglm-external
     GIT_REPOSITORY https://github.com/recp/cglm.git

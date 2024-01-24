@@ -1,3 +1,5 @@
+include(ExternalProject)
+
 ExternalProject_Add(
     sake-external
     GIT_REPOSITORY https://github.com/wervin/sake.git

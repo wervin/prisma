@@ -32,3 +32,8 @@ enum prisma_error prisma_logger_draw(struct prisma_logger *logger)
     SAKE_MACRO_UNUSED(logger);
     return PRISMA_ERROR_NONE;
 }
+
+void prisma_logger_set_ui(struct prisma_logger *logger, struct prisma_ui *ui)
+{
+    logger->ui = ui;
+}

@@ -1,3 +1,5 @@
+include(ExternalProject)
+
 ExternalProject_Add(
     glslang-external
     GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git

@@ -325,8 +325,8 @@ static void _backend_descriptorsets_destroy(void);
 static struct _backend _backend = {0};
 
 static struct _backend_info _backend_info = {
-    .vertex_shader_path = "shaders/default.vert",
-    .frag_shader_path = "shaders/default.frag",
+    .vertex_shader_path = "assets/shaders/default.vert",
+    .frag_shader_path = "assets/shaders/default.frag",
 
     .max_frames_in_flight = 3,
     .features_requested = {
