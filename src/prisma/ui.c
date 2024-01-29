@@ -3,15 +3,18 @@
 #include <cimgui.h>
 #include <cimgui_impl.h>
 
+#include <sake/vector.h>
+
 #include "prisma/ui.h"
 #include "prisma/renderer.h"
 #include "prisma/style.h"
 #include "prisma/window.h"
+#include "prisma/log.h"
 
 #include "prisma/components/editor.h"
 #include "prisma/components/logger.h"
 #include "prisma/components/menu.h"
-#include "prisma/components/viewport.h"
+#include "prisma/components/info.h"
 
 static struct prisma_ui _ui = {0};
 
@@ -33,6 +36,10 @@ enum prisma_error prisma_ui_init(void)
     if (status != PRISMA_ERROR_NONE)
         return status;
 
+    status = prisma_renderer_init_viewport();
+    if (status != PRISMA_ERROR_NONE)
+        return status;
+
     _ui.editor = (struct prisma_editor *) prisma_component_new(PRISMA_COMPONENT_TYPE_EDITOR);
     if (!_ui.editor)
         return PRISMA_ERROR_MEMORY;
@@ -45,22 +52,24 @@ enum prisma_error prisma_ui_init(void)
     if (!_ui.menu)
         return PRISMA_ERROR_MEMORY;
 
-    _ui.viewport = (struct prisma_viewport *)  prisma_component_new(PRISMA_COMPONENT_TYPE_VIEWPORT);
-    if (!_ui.viewport)
+    _ui.info = (struct prisma_info *)  prisma_component_new(PRISMA_COMPONENT_TYPE_INFO);
+    if (!_ui.info)
         return PRISMA_ERROR_MEMORY;
 
     prisma_editor_set_ui(_ui.editor, &_ui);
     prisma_logger_set_ui(_ui.logger, &_ui);
     prisma_menu_set_ui(_ui.menu, &_ui);
-    prisma_viewport_set_ui(_ui.viewport, &_ui);
+    prisma_info_set_ui(_ui.info, &_ui);
 
     return PRISMA_ERROR_NONE;
 }
 
-void prisma_ui_draw(void)
+enum prisma_error prisma_ui_draw(void)
 {   
-    prisma_window_refresh_ui();
-    prisma_renderer_refresh_ui();
+    enum prisma_error error = PRISMA_ERROR_NONE;
+
+    prisma_window_draw_ui();
+    prisma_renderer_draw_ui();
 
     igNewFrame();
 
@@ -90,47 +99,88 @@ void prisma_ui_draw(void)
 
     igBegin("Main", NULL, flags);
 
-    ImGuiID dockspace_id = igGetID_Str("DockSpace");
+    static ImGuiID dockspace_id = 0;
+    static ImGuiID dock_id = 0;
+    static ImGuiID editor_id = 0;
+    static ImGuiID log_id = 0;
+    static ImGuiID viewport_id = 0;
+    static bool init_docking = true;
 
-    if (!igDockBuilderGetNode(dockspace_id))
+    dockspace_id = igGetID_Str("DockSpace");
+    if (init_docking)
     {
         igDockBuilderRemoveNode(dockspace_id);
         igDockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_None);
-
-        ImGuiID dock_id = dockspace_id;
-        ImGuiID editor_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Left, 0.4f, NULL, &dock_id);
-        ImGuiID log_id = igDockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.25f, NULL, &editor_id);
-        ImGuiID viewport_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Right, 0.6f, NULL, &dock_id);
-
-        igDockBuilderDockWindow("Editor", editor_id);
-        igDockBuilderDockWindow("Log", log_id);
-        igDockBuilderDockWindow("Viewport", viewport_id);
-
-        igDockBuilderFinish(dock_id);
+        dock_id = dockspace_id;
+        editor_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Left, 0.4f, NULL, &dock_id);
+        log_id = igDockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.25f, NULL, &editor_id);
+        viewport_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Right, 0.6f, NULL, &dock_id);
+        init_docking = false;
     }
 
-    igDockSpace(dockspace_id, (ImVec2) {0.0f, 0.0f}, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoWindowMenuButton, NULL);
+    if (sake_vector_size(_ui.editor->contexts))
+    {
+        for (uint32_t i = 0; i < sake_vector_size(_ui.editor->contexts); i++)
+        {
+            const char *filename = prisma_editor_context_filename(_ui.editor->contexts[i]);
+            igDockBuilderDockWindow(filename, editor_id);
+        }
+    }
+        
+    igDockBuilderDockWindow("Log", log_id);
+    igDockBuilderDockWindow("Info", log_id);
+    igDockBuilderDockWindow("Viewport", viewport_id);
 
-    prisma_component_draw((struct prisma_component *) _ui.menu);
-  
-    igBegin("Editor", NULL, 0);
-    prisma_component_draw((struct prisma_component *) _ui.editor);
-    igEnd();
+    igDockBuilderFinish(dock_id);
 
+    ImGuiDockNodeFlags dock_flags = 0;
+    dock_flags |= ImGuiDockNodeFlags_PassthruCentralNode;
+    dock_flags |= ImGuiDockNodeFlags_NoWindowMenuButton;
+    dock_flags |= ImGuiDockNodeFlags_NoUndocking;
+    igDockSpace(dockspace_id, (ImVec2) {0.0f, 0.0f}, dock_flags, NULL);
+
+    igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, (ImVec2){5.f, 5.f});
+    error = prisma_component_draw((struct prisma_component *) _ui.menu);
+    igPopStyleVar(1);
+    if (error != PRISMA_ERROR_NONE)
+        goto end;
+
+    error = prisma_component_draw((struct prisma_component *) _ui.editor);
+    if (error != PRISMA_ERROR_NONE)
+        goto end;
+
+    igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, (ImVec2){5.f, 5.f});
     igBegin("Log", NULL, 0);
-    prisma_component_draw((struct prisma_component *) _ui.logger);
+    error = prisma_component_draw((struct prisma_component *) _ui.logger);
     igEnd();
+    igPopStyleVar(1);
+    if (error != PRISMA_ERROR_NONE)
+        goto end;
+
+    igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, (ImVec2){5.f, 5.f});
+    igBegin("Info", NULL, 0);
+    error = prisma_component_draw((struct prisma_component *) _ui.info);
+    igEnd();
+    igPopStyleVar(1);
+    if (error != PRISMA_ERROR_NONE)
+        goto end;
 
     igBegin("Viewport", NULL, 0);
-    prisma_component_draw((struct prisma_component *) _ui.viewport);
+    error = prisma_renderer_draw_viewport();
     igEnd();
+    if (error != PRISMA_ERROR_NONE)
+        goto end;
 
+end:
     igEnd();
-    
     igPopStyleVar(1);
     igPopStyleColor(6);
+
+    if (error != PRISMA_ERROR_NONE)    
+        return error;
     
     igRender();
+    return PRISMA_ERROR_NONE;
 }
 
 void prisma_ui_destroy(void)
@@ -141,9 +191,10 @@ void prisma_ui_destroy(void)
         prisma_component_free((struct prisma_component *) _ui.logger);
     if (_ui.menu)
         prisma_component_free((struct prisma_component *) _ui.menu);
-    if (_ui.viewport)
-        prisma_component_free((struct prisma_component *) _ui.viewport);
+    if (_ui.info)
+        prisma_component_free((struct prisma_component *) _ui.info);
     
+    prisma_renderer_destroy_viewport();
     prisma_renderer_destroy_ui();
     prisma_window_destroy_ui();
     ImGuiContext *context = igGetCurrentContext();

@@ -42,8 +42,6 @@ enum prisma_error prisma_menu_draw(struct prisma_menu *menu)
 
     enum prisma_error error = PRISMA_ERROR_NONE;
 
-    igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, (ImVec2){5.f, 5.f});
-
     if (igBeginMainMenuBar())
     {
         if (igBeginMenu("File", true))
@@ -87,8 +85,6 @@ enum prisma_error prisma_menu_draw(struct prisma_menu *menu)
         igEndMainMenuBar();
     }
 
-    igPopStyleVar(1);
-
     return error;
 }
 
@@ -110,17 +106,17 @@ static void new_file_dialog(void *args)
 
 static void open_file_dialog(void *args)
 {
-    nfdchar_t *path = NULL;
-    nfdresult_t result = NFD_OpenDialog(NULL, NULL, &path);
-    if (result != NFD_OKAY)
-        return;
+    // nfdchar_t *path = NULL;
+    // nfdresult_t result = NFD_OpenDialog(NULL, NULL, &path);
+    // if (result != NFD_OKAY)
+    //     return;
     
     struct prisma_menu *menu = (struct prisma_menu *) args;
     struct prisma_editor *editor = menu->ui->editor;
 
-    prisma_editor_open(editor, path);
+    prisma_editor_open(editor, "/home/wervin/Gits/shaders/default.frag");
 
-    free(path);
+    // free(path);
 }
 
 static void save_as_file_dialog(void *args)

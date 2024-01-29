@@ -93,7 +93,7 @@ enum prisma_error primsa_window_init_ui(void)
     return PRISMA_ERROR_NONE;
 }
 
-void prisma_window_refresh_ui(void)
+void prisma_window_draw_ui(void)
 {
     ImGui_ImplGlfw_NewFrame();
 }

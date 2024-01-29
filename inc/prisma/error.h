@@ -8,8 +8,9 @@
     X(PRISMA_ERROR_MEMORY, -3, "Memory error") \
     X(PRISMA_ERROR_VK, -4, "Vulkan error")     \
     X(PRISMA_ERROR_GLFW, -5, "GLFW error")     \
-    X(PRISMA_ERROR_GLSL, -6, "Glslang error")  \
-    X(PRISMA_ERROR_UNKNOWN, -7, "Unknown error")
+    X(PRISMA_ERROR_GLSL, -6, "GLSL error")     \
+    X(PRISMA_ERROR_POULPE, -7, "Poulpe error") \
+    X(PRISMA_ERROR_UNKNOWN, -8, "Unknown error")
 
 enum prisma_error
 {

@@ -35,7 +35,8 @@ enum prisma_error prisma_backend_init(void)
 
 void prisma_backend_destroy(void)
 {
-    sake_vector_free(_backend.requests);
+    if (_backend.requests)
+        sake_vector_free(_backend.requests);
 }
 
 enum prisma_error prisma_backend_queue_request(struct prisma_request *request)

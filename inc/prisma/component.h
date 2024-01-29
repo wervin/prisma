@@ -11,7 +11,7 @@
     X(PRISMA_COMPONENT_TYPE_EDITOR, 1, editor) \
     X(PRISMA_COMPONENT_TYPE_LOGGER, 2, logger) \
     X(PRISMA_COMPONENT_TYPE_MENU, 3, menu)     \
-    X(PRISMA_COMPONENT_TYPE_VIEWPORT, 4, viewport)
+    X(PRISMA_COMPONENT_TYPE_INFO, 4, info)
 
 enum prisma_component_type
 {
@@ -26,7 +26,6 @@ enum prisma_component_type
 struct prisma_component
 {
     enum prisma_component_type type;
-    struct prisma_component *parent;
 };
 
 struct prisma_component * prisma_component_new(enum prisma_component_type type);

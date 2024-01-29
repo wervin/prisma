@@ -38,18 +38,23 @@ enum prisma_error prisma_application_init(struct prisma_application_info *info)
 
 enum prisma_error prisma_application_run()
 {    
+    enum prisma_error error = PRISMA_ERROR_NONE;
     prisma_window_show();
     
     while (!prisma_window_should_close())
     {
         prisma_window_poll_events();
-        prisma_ui_draw();
-        prisma_renderer_draw();
+        error = prisma_ui_draw();
+        if (error != PRISMA_ERROR_NONE)
+            return error;
+        error = prisma_renderer_draw();
+        if (error != PRISMA_ERROR_NONE)
+            return error;
     }
     
     prisma_renderer_wait_idle();
 
-    return PRISMA_ERROR_NONE;
+    return error;
 }
 
 void prisma_application_destroy()

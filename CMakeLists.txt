@@ -12,9 +12,9 @@ add_subdirectory(externals/sake)
 
 set(PRISMA_SOURCES
     src/prisma/components/editor.c
+    src/prisma/components/info.c
     src/prisma/components/logger.c
     src/prisma/components/menu.c
-    src/prisma/components/viewport.c
     src/prisma/application.c
     src/prisma/backend.c
     src/prisma/component.c

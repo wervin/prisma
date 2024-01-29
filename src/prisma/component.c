@@ -21,7 +21,8 @@ struct prisma_component *prisma_component_new(enum prisma_component_type type)
 #define X(__def, __id, __type)                                          \
     case __id:                                                          \
         component = (struct prisma_component *)prisma_##__type##_new(); \
-        component->parent = NULL;                                       \
+        if (!component)                                                 \
+            return NULL;                                                \
         component->type = __id;                                         \
         return component;
 

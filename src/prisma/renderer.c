@@ -48,51 +48,11 @@ struct _backend_swapchain
   VkImageView *vk_image_views;
 };
 
-struct _backend_renderpass
-{
-  VkRenderPass vk_renderpass;
-};
-
-struct _backend_framebuffers
-{
-  VkFramebuffer *vk_framebuffers;
-};
-
-struct _backend_commandpool
-{
-  VkCommandPool vk_commandpool;
-};
-
-struct _backend_commandbuffers
-{
-  VkCommandBuffer *vk_commandbuffers;
-};
-
 struct _backend_sync
 {
   VkFence *vk_render_fence;
   VkSemaphore *vk_present_semaphore;
   VkSemaphore *vk_render_semaphore;
-};
-
-struct _backend_shader
-{
-  VkShaderModule vk_shader_module;
-};
-
-struct _backend_descriptorsetlayout
-{
-  VkDescriptorSetLayout vk_descriptorsetlayout;
-};
-
-struct _backend_pipelinelayout
-{
-  VkPipelineLayout vk_pipelinelayout;
-};
-
-struct _backend_pipeline
-{
-  VkPipeline vk_pipeline;
 };
 
 struct _backend_vertex2d_model_input
@@ -136,16 +96,6 @@ struct _backend_uniformbuffer_object
   alignas(4) float time;
 };
 
-struct _backend_descriptorpool
-{
-  VkDescriptorPool vk_descriptorpool;
-};
-
-struct _backend_descriptorsets
-{
-  VkDescriptorSet *vk_descriptorsets;
-};
-
 struct _backend_ui
 {
   VkDescriptorPool vk_descriptorpool;
@@ -160,20 +110,30 @@ struct _backend_viewport
   VkDeviceMemory *vk_device_memories;
   VkImage *vk_images;
   VkImageView *vk_image_views;
+  VkPipelineLayout vk_pipelinelayout;
   VkPipeline vk_pipeline;
-  VkDescriptorSet *vk_descriptorsets;
   VkSampler vk_sampler;
   VkCommandPool vk_commandpool;
   VkCommandBuffer *vk_commandbuffers;
   VkRenderPass vk_renderpass;
   VkFramebuffer *vk_framebuffers;
   VkExtent2D vk_extent;
+  VkShaderModule vk_vertex_shader_module;
+  VkShaderModule vk_frag_shader_module;
+  VkDescriptorSetLayout vk_descriptorsetlayout;
+  VkDescriptorPool vk_descriptorpool;
+  VkDescriptorSet *vk_present_descriptorsets;
+  VkDescriptorSet *vk_texture_descriptorsets;
+  struct _backend_vertexbuffer vertexbuffer;
+  struct _backend_indexbuffer indexbuffer;
+  struct _backend_uniformbuffer uniformbuffer;
 };
 
 struct _backend
 {
   uint64_t frame_count;
   uint32_t current_frame_in_flight;
+  struct timeval timer;
 
   struct _backend_instance instance;
   struct _backend_device device;
@@ -181,17 +141,6 @@ struct _backend
   struct _backend_sync sync;
   struct _backend_ui ui;
   struct _backend_viewport viewport;
-
-/* To refactor */
-  struct _backend_shader vertex_shader;
-  struct _backend_shader frag_shader;
-  struct _backend_descriptorsetlayout descriptorsetlayout;
-  struct _backend_pipelinelayout pipelinelayout;
-  struct _backend_vertexbuffer vertexbuffer;
-  struct _backend_indexbuffer indexbuffer;
-  struct _backend_uniformbuffer uniformbuffer;
-  struct _backend_descriptorpool descriptorpool;
-  struct _backend_descriptorsets descriptorsets;
 };
 
 struct _backend_info
@@ -277,9 +226,9 @@ static enum prisma_error _backend_sync_init(void);
 
 static void _backend_sync_destroy(void);
 
-static enum prisma_error _backend_shader_init(struct _backend_shader *shader, glslang_stage_t stage, const char *path);
+static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_stage_t stage, const char *path);
 
-static void _backend_shader_destroy(struct _backend_shader *shader);
+static void _backend_shader_destroy(VkShaderModule shader);
 
 static enum prisma_error _backend_descriptorsetlayout_init(void);
 
@@ -288,6 +237,8 @@ static void _backend_descriptorsetlayout_destroy(void);
 static enum prisma_error _backend_pipelinelayout_init(void);
 
 static void _backend_pipelinelayout_destroy(void);
+
+static enum prisma_error _backend_pipeline_create(void);
 
 static enum prisma_error _backend_buffer_create(struct _backend_buffer *buffer,
                                                 uint32_t size,
@@ -326,7 +277,6 @@ static struct _backend _backend = {0};
 
 static struct _backend_info _backend_info = {
     .vertex_shader_path = "assets/shaders/default.vert",
-    .frag_shader_path = "assets/shaders/default.frag",
 
     .max_frames_in_flight = 3,
     .features_requested = {
@@ -457,17 +407,17 @@ enum prisma_error prisma_renderer_draw(void)
     scissor.extent = _backend.viewport.vk_extent;
     vkCmdSetScissor(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight], 0, 1, &scissor);
 
-    VkBuffer vertex_buffers[] = {_backend.vertexbuffer.buffer.vk_buffer};
+    VkBuffer vertex_buffers[] = {_backend.viewport.vertexbuffer.buffer.vk_buffer};
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight], 0, 1, vertex_buffers, offsets);
 
-    vkCmdBindIndexBuffer(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight], _backend.indexbuffer.buffer.vk_buffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdBindIndexBuffer(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight], _backend.viewport.indexbuffer.buffer.vk_buffer, 0, VK_INDEX_TYPE_UINT16);
 
     vkCmdBindDescriptorSets(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight],
-                            VK_PIPELINE_BIND_POINT_GRAPHICS, _backend.pipelinelayout.vk_pipelinelayout,
-                            0, 1, &_backend.descriptorsets.vk_descriptorsets[_backend.current_frame_in_flight], 0, NULL);
+                            VK_PIPELINE_BIND_POINT_GRAPHICS, _backend.viewport.vk_pipelinelayout,
+                            0, 1, &_backend.viewport.vk_present_descriptorsets[_backend.current_frame_in_flight], 0, NULL);
 
-    vkCmdDrawIndexed(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight], _backend.indexbuffer.index_count, 1, 0, 0, 0);
+    vkCmdDrawIndexed(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight], _backend.viewport.indexbuffer.index_count, 1, 0, 0, 0);
 
     vkCmdEndRenderPass(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight]);
 
@@ -570,16 +520,7 @@ void prisma_renderer_wait_idle(void)
 
 void prisma_renderer_destroy(void)
 {
-  _backend_descriptorsets_destroy();
-  _backend_descriptorpool_destroy();
-  _backend_uniformbuffer_destroy();
-  _backend_indexbuffer_destroy();
-  _backend_vertexbuffer_destroy();
-  _backend_shader_destroy(&_backend.vertex_shader);
-  _backend_shader_destroy(&_backend.frag_shader);
   _backend_sync_destroy();
-  _backend_pipelinelayout_destroy();
-  _backend_descriptorsetlayout_destroy();
   _backend_swapchain_destroy();
   _backend_device_destroy();
   _backend_instance_destroy();
@@ -730,14 +671,9 @@ enum prisma_error prisma_renderer_init_ui(void)
   return PRISMA_ERROR_NONE;
 }
 
-void prisma_renderer_refresh_ui(void)
-{
-  ImGui_ImplVulkan_NewFrame();
-}
-
 void prisma_renderer_draw_ui(void)
 {
-
+  ImGui_ImplVulkan_NewFrame();
 }
 
 void prisma_renderer_destroy_ui(void)
@@ -1035,11 +971,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
     vkCreateFramebuffer(_backend.device.vk_device, &framebuffer_info, NULL, &_backend.viewport.vk_framebuffers[i]);
   }
 
-  status = _backend_shader_init(&_backend.vertex_shader, GLSLANG_STAGE_VERTEX, _backend_info.vertex_shader_path);
-  if (status != PRISMA_ERROR_NONE)
-    return status;
-
-  status = _backend_shader_init(&_backend.frag_shader, GLSLANG_STAGE_FRAGMENT, _backend_info.frag_shader_path);
+  status = _backend_shader_init(&_backend.viewport.vk_vertex_shader_module, GLSLANG_STAGE_VERTEX, _backend_info.vertex_shader_path);
   if (status != PRISMA_ERROR_NONE)
     return status;
 
@@ -1071,139 +1003,69 @@ enum prisma_error prisma_renderer_init_viewport(void)
   if (status != PRISMA_ERROR_NONE)
     return status;
 
-  /* Pipeline */
-  VkPipelineShaderStageCreateInfo shader_stage_info[2] = {0};
-  shader_stage_info[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  shader_stage_info[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  shader_stage_info[0].module = _backend.vertex_shader.vk_shader_module;
-  shader_stage_info[0].pName = "main";
-
-  shader_stage_info[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  shader_stage_info[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  shader_stage_info[1].module = _backend.frag_shader.vk_shader_module;
-  shader_stage_info[1].pName = "main";
-
-  struct _backend_vertex2d_model_input _backend_vertex2d_model_input = {
-      .attributes = {
-          {.binding = 0,
-           .location = 0,
-           .format = VK_FORMAT_R32G32_SFLOAT,
-           .offset = offsetof(struct _backend_vertex2d_model, position)}},
-      .binding = {.binding = 0, .stride = sizeof(struct _backend_vertex2d_model), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX}};
-
-  VkPipelineVertexInputStateCreateInfo vertex_input_info = {0};
-  vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-  vertex_input_info.vertexBindingDescriptionCount = 1;
-  vertex_input_info.vertexAttributeDescriptionCount = 1;
-  vertex_input_info.pVertexBindingDescriptions = &_backend_vertex2d_model_input.binding;
-  vertex_input_info.pVertexAttributeDescriptions = _backend_vertex2d_model_input.attributes;
-
-  VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {0};
-  input_assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  input_assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-  input_assembly_info.primitiveRestartEnable = VK_FALSE;
-
-  VkPipelineViewportStateCreateInfo viewportstate_info = {0};
-  viewportstate_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-  viewportstate_info.viewportCount = 1;
-  viewportstate_info.pViewports = NULL;
-  viewportstate_info.scissorCount = 1;
-  viewportstate_info.pScissors = NULL;
-
-  VkPipelineRasterizationStateCreateInfo rasterization_info = {0};
-  rasterization_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterization_info.depthClampEnable = VK_FALSE;
-  rasterization_info.rasterizerDiscardEnable = VK_FALSE;
-  rasterization_info.polygonMode = VK_POLYGON_MODE_FILL;
-  rasterization_info.lineWidth = 1.0f;
-  rasterization_info.cullMode = VK_CULL_MODE_NONE;
-  rasterization_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
-  rasterization_info.depthBiasEnable = VK_FALSE;
-
-  VkPipelineMultisampleStateCreateInfo multisampling_info = {0};
-  multisampling_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-  multisampling_info.sampleShadingEnable = VK_FALSE;
-  multisampling_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-  VkPipelineColorBlendAttachmentState colorblend_attachment_info = {0};
-  colorblend_attachment_info.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-  colorblend_attachment_info.blendEnable = VK_FALSE;
-
-  VkPipelineColorBlendStateCreateInfo colorblending_info = {0};
-  colorblending_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-  colorblending_info.logicOpEnable = VK_FALSE;
-  colorblending_info.logicOp = VK_LOGIC_OP_COPY;
-  colorblending_info.attachmentCount = 1;
-  colorblending_info.pAttachments = &colorblend_attachment_info;
-  colorblending_info.blendConstants[0] = 0.0f;
-  colorblending_info.blendConstants[1] = 0.0f;
-  colorblending_info.blendConstants[2] = 0.0f;
-  colorblending_info.blendConstants[3] = 0.0f;
-
-  VkDynamicState dynamic_states[2] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-  VkPipelineDynamicStateCreateInfo dynamicstate_info = {0};
-  dynamicstate_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-  dynamicstate_info.dynamicStateCount = 2;
-  dynamicstate_info.pDynamicStates = dynamic_states;
-
-  VkGraphicsPipelineCreateInfo pipeline_info = {0};
-  pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-  pipeline_info.stageCount = 2;
-  pipeline_info.pStages = shader_stage_info;
-  pipeline_info.pVertexInputState = &vertex_input_info;
-  pipeline_info.pInputAssemblyState = &input_assembly_info;
-  pipeline_info.pViewportState = &viewportstate_info;
-  pipeline_info.pRasterizationState = &rasterization_info;
-  pipeline_info.pMultisampleState = &multisampling_info;
-  pipeline_info.pColorBlendState = &colorblending_info;
-  pipeline_info.pDynamicState = &dynamicstate_info;
-  pipeline_info.layout = _backend.pipelinelayout.vk_pipelinelayout;
-  pipeline_info.renderPass = _backend.viewport.vk_renderpass;
-  pipeline_info.subpass = 0;
-  pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
-  if (vkCreateGraphicsPipelines(_backend.device.vk_device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &_backend.viewport.vk_pipeline) != VK_SUCCESS)
-  {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create pipeline");
-    return PRISMA_ERROR_VK;
-  }
+  status = _backend_pipeline_create();
+  if (status != PRISMA_ERROR_NONE)
+    return status;
 
   /* Descriptor Sets */
-  _backend.viewport.vk_descriptorsets = malloc(_backend_info.max_frames_in_flight * sizeof(VkDescriptorSet));
-  if (_backend.viewport.vk_descriptorsets == NULL)
+  _backend.viewport.vk_texture_descriptorsets = malloc(_backend_info.max_frames_in_flight * sizeof(VkDescriptorSet));
+  if (_backend.viewport.vk_texture_descriptorsets == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
   for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
-    _backend.viewport.vk_descriptorsets[i] = ImGui_ImplVulkan_AddTexture(_backend.viewport.vk_sampler,
-                                                                         _backend.viewport.vk_image_views[i],
-                                                                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    _backend.viewport.vk_texture_descriptorsets[i] = ImGui_ImplVulkan_AddTexture(_backend.viewport.vk_sampler,
+                                                                                 _backend.viewport.vk_image_views[i],
+                                                                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   return PRISMA_ERROR_NONE;
 }
 
-void prisma_renderer_draw_viewport(void)
+enum prisma_error prisma_renderer_draw_viewport(void)
 {
   ImVec2 viewport = {0};
   igGetContentRegionAvail(&viewport);
 
   if (viewport.x <= 0 || viewport.y <= 0)
-    return;
+    return PRISMA_ERROR_NONE;
 
   if (viewport.x != _backend.viewport.vk_extent.width || viewport.y != _backend.viewport.vk_extent.height)
   {
     _backend.viewport.vk_extent = (VkExtent2D){.width = viewport.x, .height = viewport.y};
-    _backend_swapchain_recreate();
-    return;
+    return _backend_swapchain_recreate();
   }
 
-  igImage(_backend.viewport.vk_descriptorsets[_backend.current_frame_in_flight],
+  igImage(_backend.viewport.vk_texture_descriptorsets[_backend.current_frame_in_flight],
           (ImVec2){_backend.viewport.vk_extent.width, _backend.viewport.vk_extent.height},
           (ImVec2){0, 0},
           (ImVec2){1, 1},
           (ImVec4){1, 1, 1, 1},
           (ImVec4){0, 0, 0, 0});
+
+  return PRISMA_ERROR_NONE;
+}
+
+enum prisma_error prisma_renderer_update_viewport(const char *path)
+{
+  enum prisma_error error = PRISMA_ERROR_NONE;
+
+  _backend_device_wait_idle();
+
+  vkDestroyPipeline(_backend.device.vk_device, _backend.viewport.vk_pipeline, NULL);
+
+  _backend_shader_destroy(_backend.viewport.vk_frag_shader_module);
+
+  error = _backend_shader_init(&_backend.viewport.vk_frag_shader_module, GLSLANG_STAGE_FRAGMENT, path);
+  if (error != PRISMA_ERROR_NONE)
+    return error;
+
+  error = _backend_pipeline_create();
+  if (error != PRISMA_ERROR_NONE)
+    return error;
+  
+  return error;
 }
 
 void prisma_renderer_destroy_viewport(void)
@@ -1223,16 +1085,15 @@ void prisma_renderer_destroy_viewport(void)
   vkFreeDescriptorSets(_backend.device.vk_device,
                        _backend.ui.vk_descriptorpool,
                        _backend_info.max_frames_in_flight,
-                       _backend.viewport.vk_descriptorsets);
+                       _backend.viewport.vk_texture_descriptorsets);
 
   vkFreeCommandBuffers(_backend.device.vk_device, _backend.viewport.vk_commandpool, _backend_info.max_frames_in_flight, _backend.viewport.vk_commandbuffers);
   vkDestroyCommandPool(_backend.device.vk_device, _backend.viewport.vk_commandpool, NULL);
   vkDestroyRenderPass(_backend.device.vk_device, _backend.viewport.vk_renderpass, NULL);
   vkDestroyPipeline(_backend.device.vk_device, _backend.viewport.vk_pipeline, NULL);
 
-
-  if (_backend.viewport.vk_descriptorsets)
-    free(_backend.viewport.vk_descriptorsets);
+  if (_backend.viewport.vk_texture_descriptorsets)
+    free(_backend.viewport.vk_texture_descriptorsets);
   if (_backend.viewport.vk_device_memories)
     free(_backend.viewport.vk_device_memories);
   if (_backend.viewport.vk_images)
@@ -1243,6 +1104,16 @@ void prisma_renderer_destroy_viewport(void)
     free(_backend.viewport.vk_framebuffers);
   if (_backend.viewport.vk_commandbuffers)
     free(_backend.viewport.vk_commandbuffers);
+
+  _backend_descriptorsets_destroy();
+  _backend_descriptorpool_destroy();
+  _backend_uniformbuffer_destroy();
+  _backend_indexbuffer_destroy();
+  _backend_vertexbuffer_destroy();
+  _backend_shader_destroy(_backend.viewport.vk_vertex_shader_module);
+  _backend_shader_destroy(_backend.viewport.vk_frag_shader_module);
+  _backend_pipelinelayout_destroy();
+  _backend_descriptorsetlayout_destroy();
 }
 
 static enum prisma_error _backend_instance_init(void)
@@ -1262,6 +1133,8 @@ static enum prisma_error _backend_instance_init(void)
   status = _backend_instance_create_surface();
   if (status != PRISMA_ERROR_NONE)
     return status;
+
+  gettimeofday(&_backend.timer, NULL);
 
   return PRISMA_ERROR_NONE;
 }
@@ -1918,13 +1791,13 @@ static enum prisma_error _backend_swapchain_recreate(void)
 
   _backend_device_wait_idle();
 
-  if (_backend.viewport.vk_descriptorsets)
+  if (_backend.viewport.vk_texture_descriptorsets)
   {
     vkFreeDescriptorSets(_backend.device.vk_device,
                          _backend.ui.vk_descriptorpool,
                          _backend_info.max_frames_in_flight,
-                         _backend.viewport.vk_descriptorsets);
-    free(_backend.viewport.vk_descriptorsets);
+                         _backend.viewport.vk_texture_descriptorsets);
+    free(_backend.viewport.vk_texture_descriptorsets);
   }
 
   if (_backend.viewport.vk_framebuffers)
@@ -1940,8 +1813,6 @@ static enum prisma_error _backend_swapchain_recreate(void)
       vkDestroyFramebuffer(_backend.device.vk_device, _backend.ui.vk_framebuffers[i], NULL);
     free(_backend.ui.vk_framebuffers);
   }
-
-  // _backend_framebuffers_destroy();
 
   for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
@@ -1962,10 +1833,6 @@ static enum prisma_error _backend_swapchain_recreate(void)
   status = _backend_swapchain_init();
   if (status != PRISMA_ERROR_NONE)
     return status;
-
-  // status = _backend_framebuffers_init();
-  // if (status != PRISMA_ERROR_NONE)
-  //   return status;
 
   _backend.ui.vk_framebuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkFramebuffer));
   if (_backend.ui.vk_framebuffers == NULL)
@@ -2155,17 +2022,17 @@ static enum prisma_error _backend_swapchain_recreate(void)
     vkCreateFramebuffer(_backend.device.vk_device, &framebuffer_info, NULL, &_backend.viewport.vk_framebuffers[i]);
   }
 
-  _backend.viewport.vk_descriptorsets = malloc(_backend_info.max_frames_in_flight * sizeof(VkDescriptorSet));
-  if (_backend.viewport.vk_descriptorsets == NULL)
+  _backend.viewport.vk_texture_descriptorsets = malloc(_backend_info.max_frames_in_flight * sizeof(VkDescriptorSet));
+  if (_backend.viewport.vk_texture_descriptorsets == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
   for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
-    _backend.viewport.vk_descriptorsets[i] = ImGui_ImplVulkan_AddTexture(_backend.viewport.vk_sampler,
-                                                                         _backend.viewport.vk_image_views[i],
-                                                                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    _backend.viewport.vk_texture_descriptorsets[i] = ImGui_ImplVulkan_AddTexture(_backend.viewport.vk_sampler,
+                                                                                 _backend.viewport.vk_image_views[i],
+                                                                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   return PRISMA_ERROR_NONE;
 }
@@ -2247,12 +2114,12 @@ static void _backend_sync_destroy(void)
   }
 }
 
-static enum prisma_error _backend_shader_init(struct _backend_shader *shader, glslang_stage_t stage, const char *path)
+static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_stage_t stage, const char *path)
 {
   uint32_t size;
   uint8_t *buffer;
 
-  FILE *fd = fopen(path, "rb");
+  FILE *fd = fopen(path, "r");
   if (!fd)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_FILE, path);
@@ -2262,7 +2129,7 @@ static enum prisma_error _backend_shader_init(struct _backend_shader *shader, gl
   fseek(fd, 0, SEEK_END);
   size = ftell(fd);
 
-  buffer = malloc(size * sizeof(uint8_t));
+  buffer = malloc(size + 1* sizeof(uint8_t));
   if (buffer == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
@@ -2272,6 +2139,8 @@ static enum prisma_error _backend_shader_init(struct _backend_shader *shader, gl
   rewind(fd);
   fread(buffer, 1, size, fd);
   fclose(fd);
+
+  buffer[size] = '\0';
 
   glslang_initialize_process();
 
@@ -2306,8 +2175,6 @@ static enum prisma_error _backend_shader_init(struct _backend_shader *shader, gl
     return PRISMA_ERROR_GLSL;
   }
 
-  free(buffer);
-
   if (!glslang_shader_parse(glsl_shader, &glsl_input))
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_GLSL, "GLSL parsing failed");
@@ -2317,8 +2184,11 @@ static enum prisma_error _backend_shader_init(struct _backend_shader *shader, gl
     PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_preprocessed_code(glsl_shader));
     glslang_shader_delete(glsl_shader);
     glslang_finalize_process();
+    free(buffer);
     return PRISMA_ERROR_GLSL;
   }
+
+  free(buffer);
 
   glslang_program_t *glsl_program = glslang_program_create();
   glslang_program_add_shader(glsl_program, glsl_shader);
@@ -2343,7 +2213,7 @@ static enum prisma_error _backend_shader_init(struct _backend_shader *shader, gl
   create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   create_info.codeSize = glslang_program_SPIRV_get_size(glsl_program) * sizeof(uint32_t);
   create_info.pCode = glslang_program_SPIRV_get_ptr(glsl_program);
-  if (vkCreateShaderModule(_backend.device.vk_device, &create_info, NULL, &shader->vk_shader_module) != VK_SUCCESS)
+  if (vkCreateShaderModule(_backend.device.vk_device, &create_info, NULL, shader) != VK_SUCCESS)
   {
     glslang_program_delete(glsl_program);
     glslang_finalize_process();
@@ -2356,9 +2226,10 @@ static enum prisma_error _backend_shader_init(struct _backend_shader *shader, gl
   return PRISMA_ERROR_NONE;
 }
 
-static void _backend_shader_destroy(struct _backend_shader *shader)
+static void _backend_shader_destroy(VkShaderModule shader)
 {
-  vkDestroyShaderModule(_backend.device.vk_device, shader->vk_shader_module, NULL);
+  if (shader)
+    vkDestroyShaderModule(_backend.device.vk_device, shader, NULL);
 }
 
 static enum prisma_error _backend_descriptorsetlayout_init(void)
@@ -2374,7 +2245,7 @@ static enum prisma_error _backend_descriptorsetlayout_init(void)
   layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   layout_info.bindingCount = 1;
   layout_info.pBindings = &ubo_layoutbinding_info;
-  if (vkCreateDescriptorSetLayout(_backend.device.vk_device, &layout_info, NULL, &_backend.descriptorsetlayout.vk_descriptorsetlayout) != VK_SUCCESS)
+  if (vkCreateDescriptorSetLayout(_backend.device.vk_device, &layout_info, NULL, &_backend.viewport.vk_descriptorsetlayout) != VK_SUCCESS)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create descriptor set layout");
     return PRISMA_ERROR_VK;
@@ -2385,7 +2256,7 @@ static enum prisma_error _backend_descriptorsetlayout_init(void)
 
 static void _backend_descriptorsetlayout_destroy(void)
 {
-  vkDestroyDescriptorSetLayout(_backend.device.vk_device, _backend.descriptorsetlayout.vk_descriptorsetlayout, NULL);
+  vkDestroyDescriptorSetLayout(_backend.device.vk_device, _backend.viewport.vk_descriptorsetlayout, NULL);
 }
 
 static enum prisma_error _backend_pipelinelayout_init(void)
@@ -2394,11 +2265,11 @@ static enum prisma_error _backend_pipelinelayout_init(void)
   pipelinelayout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelinelayout_info.flags = 0;
   pipelinelayout_info.setLayoutCount = 1;
-  pipelinelayout_info.pSetLayouts = &_backend.descriptorsetlayout.vk_descriptorsetlayout;
+  pipelinelayout_info.pSetLayouts = &_backend.viewport.vk_descriptorsetlayout;
   pipelinelayout_info.pushConstantRangeCount = 0;
   pipelinelayout_info.pPushConstantRanges = NULL;
 
-  if (vkCreatePipelineLayout(_backend.device.vk_device, &pipelinelayout_info, NULL, &_backend.pipelinelayout.vk_pipelinelayout) !=
+  if (vkCreatePipelineLayout(_backend.device.vk_device, &pipelinelayout_info, NULL, &_backend.viewport.vk_pipelinelayout) !=
       VK_SUCCESS)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create pipeline layout");
@@ -2410,7 +2281,113 @@ static enum prisma_error _backend_pipelinelayout_init(void)
 
 static void _backend_pipelinelayout_destroy(void)
 {
-  vkDestroyPipelineLayout(_backend.device.vk_device, _backend.pipelinelayout.vk_pipelinelayout, NULL);
+  vkDestroyPipelineLayout(_backend.device.vk_device, _backend.viewport.vk_pipelinelayout, NULL);
+}
+
+static enum prisma_error _backend_pipeline_create(void)
+{
+  /* Pipeline */
+  uint32_t shader_count = _backend.viewport.vk_frag_shader_module ? 2 : 1;
+  VkPipelineShaderStageCreateInfo shader_stage_info[shader_count];
+  memset(&shader_stage_info, 0, sizeof(VkPipelineShaderStageCreateInfo) * shader_count);
+
+  shader_stage_info[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  shader_stage_info[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  shader_stage_info[0].module = _backend.viewport.vk_vertex_shader_module;
+  shader_stage_info[0].pName = "main";
+
+  if (_backend.viewport.vk_frag_shader_module)
+  {
+    shader_stage_info[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shader_stage_info[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    shader_stage_info[1].module = _backend.viewport.vk_frag_shader_module;
+    shader_stage_info[1].pName = "main";
+  }
+
+  struct _backend_vertex2d_model_input _backend_vertex2d_model_input = {
+      .attributes = {
+          {.binding = 0,
+           .location = 0,
+           .format = VK_FORMAT_R32G32_SFLOAT,
+           .offset = offsetof(struct _backend_vertex2d_model, position)}},
+      .binding = {.binding = 0, .stride = sizeof(struct _backend_vertex2d_model), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX}};
+
+  VkPipelineVertexInputStateCreateInfo vertex_input_info = {0};
+  vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+  vertex_input_info.vertexBindingDescriptionCount = 1;
+  vertex_input_info.vertexAttributeDescriptionCount = 1;
+  vertex_input_info.pVertexBindingDescriptions = &_backend_vertex2d_model_input.binding;
+  vertex_input_info.pVertexAttributeDescriptions = _backend_vertex2d_model_input.attributes;
+
+  VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {0};
+  input_assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  input_assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  input_assembly_info.primitiveRestartEnable = VK_FALSE;
+
+  VkPipelineViewportStateCreateInfo viewportstate_info = {0};
+  viewportstate_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+  viewportstate_info.viewportCount = 1;
+  viewportstate_info.pViewports = NULL;
+  viewportstate_info.scissorCount = 1;
+  viewportstate_info.pScissors = NULL;
+
+  VkPipelineRasterizationStateCreateInfo rasterization_info = {0};
+  rasterization_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+  rasterization_info.depthClampEnable = VK_FALSE;
+  rasterization_info.rasterizerDiscardEnable = VK_FALSE;
+  rasterization_info.polygonMode = VK_POLYGON_MODE_FILL;
+  rasterization_info.lineWidth = 1.0f;
+  rasterization_info.cullMode = VK_CULL_MODE_NONE;
+  rasterization_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
+  rasterization_info.depthBiasEnable = VK_FALSE;
+
+  VkPipelineMultisampleStateCreateInfo multisampling_info = {0};
+  multisampling_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+  multisampling_info.sampleShadingEnable = VK_FALSE;
+  multisampling_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+  VkPipelineColorBlendAttachmentState colorblend_attachment_info = {0};
+  colorblend_attachment_info.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  colorblend_attachment_info.blendEnable = VK_FALSE;
+
+  VkPipelineColorBlendStateCreateInfo colorblending_info = {0};
+  colorblending_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+  colorblending_info.logicOpEnable = VK_FALSE;
+  colorblending_info.logicOp = VK_LOGIC_OP_COPY;
+  colorblending_info.attachmentCount = 1;
+  colorblending_info.pAttachments = &colorblend_attachment_info;
+  colorblending_info.blendConstants[0] = 0.0f;
+  colorblending_info.blendConstants[1] = 0.0f;
+  colorblending_info.blendConstants[2] = 0.0f;
+  colorblending_info.blendConstants[3] = 0.0f;
+
+  VkDynamicState dynamic_states[2] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  VkPipelineDynamicStateCreateInfo dynamicstate_info = {0};
+  dynamicstate_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+  dynamicstate_info.dynamicStateCount = 2;
+  dynamicstate_info.pDynamicStates = dynamic_states;
+
+  VkGraphicsPipelineCreateInfo pipeline_info = {0};
+  pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipeline_info.stageCount = shader_count;
+  pipeline_info.pStages = shader_stage_info;
+  pipeline_info.pVertexInputState = &vertex_input_info;
+  pipeline_info.pInputAssemblyState = &input_assembly_info;
+  pipeline_info.pViewportState = &viewportstate_info;
+  pipeline_info.pRasterizationState = &rasterization_info;
+  pipeline_info.pMultisampleState = &multisampling_info;
+  pipeline_info.pColorBlendState = &colorblending_info;
+  pipeline_info.pDynamicState = &dynamicstate_info;
+  pipeline_info.layout = _backend.viewport.vk_pipelinelayout;
+  pipeline_info.renderPass = _backend.viewport.vk_renderpass;
+  pipeline_info.subpass = 0;
+  pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
+  if (vkCreateGraphicsPipelines(_backend.device.vk_device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &_backend.viewport.vk_pipeline) != VK_SUCCESS)
+  {
+    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create pipeline");
+    return PRISMA_ERROR_VK;
+  }
+  return PRISMA_ERROR_NONE;
 }
 
 static enum prisma_error _backend_buffer_create(struct _backend_buffer *buffer,
@@ -2530,14 +2507,14 @@ static enum prisma_error _backend_vertexbuffer_init(void)
   memcpy(data, vertices, vertex_count * size);
   vkUnmapMemory(_backend.device.vk_device, staging_buffer.vk_devicememory);
 
-  status = _backend_buffer_create(&_backend.vertexbuffer.buffer,
+  status = _backend_buffer_create(&_backend.viewport.vertexbuffer.buffer,
                                   vertex_count * size,
                                   VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   if (status != PRISMA_ERROR_NONE)
     return status;
 
-  status = _backend_buffer_copy(&staging_buffer, &_backend.vertexbuffer.buffer, vertex_count * size);
+  status = _backend_buffer_copy(&staging_buffer, &_backend.viewport.vertexbuffer.buffer, vertex_count * size);
   if (status != PRISMA_ERROR_NONE)
     return status;
 
@@ -2548,7 +2525,7 @@ static enum prisma_error _backend_vertexbuffer_init(void)
 
 void _backend_vertexbuffer_destroy(void)
 {
-  _backend_buffer_destroy(&_backend.vertexbuffer.buffer);
+  _backend_buffer_destroy(&_backend.viewport.vertexbuffer.buffer);
 }
 
 static enum prisma_error _backend_indexbuffer_init(void)
@@ -2559,7 +2536,7 @@ static enum prisma_error _backend_indexbuffer_init(void)
   uint32_t index_count = sizeof(indices) / sizeof(uint16_t);
   uint32_t size = sizeof(uint16_t);
 
-  _backend.indexbuffer.index_count = index_count;
+  _backend.viewport.indexbuffer.index_count = index_count;
 
   struct _backend_buffer staging_buffer = {0};
 
@@ -2575,14 +2552,14 @@ static enum prisma_error _backend_indexbuffer_init(void)
   memcpy(data, indices, index_count * size);
   vkUnmapMemory(_backend.device.vk_device, staging_buffer.vk_devicememory);
 
-  status = _backend_buffer_create(&_backend.indexbuffer.buffer,
+  status = _backend_buffer_create(&_backend.viewport.indexbuffer.buffer,
                                   index_count * size,
                                   VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   if (status != PRISMA_ERROR_NONE)
     return status;
 
-  status = _backend_buffer_copy(&staging_buffer, &_backend.indexbuffer.buffer, index_count * size);
+  status = _backend_buffer_copy(&staging_buffer, &_backend.viewport.indexbuffer.buffer, index_count * size);
   if (status != PRISMA_ERROR_NONE)
     return status;
 
@@ -2593,22 +2570,22 @@ static enum prisma_error _backend_indexbuffer_init(void)
 
 static void _backend_indexbuffer_destroy(void)
 {
-  _backend_buffer_destroy(&_backend.indexbuffer.buffer);
+  _backend_buffer_destroy(&_backend.viewport.indexbuffer.buffer);
 }
 
 static enum prisma_error _backend_uniformbuffer_init(void)
 {
-  _backend.uniformbuffer.size = sizeof(struct _backend_uniformbuffer_object);
+  _backend.viewport.uniformbuffer.size = sizeof(struct _backend_uniformbuffer_object);
 
-  _backend.uniformbuffer.buffers = malloc(_backend_info.max_frames_in_flight * sizeof(struct _backend_buffer));
-  if (_backend.uniformbuffer.buffers == NULL)
+  _backend.viewport.uniformbuffer.buffers = malloc(_backend_info.max_frames_in_flight * sizeof(struct _backend_buffer));
+  if (_backend.viewport.uniformbuffer.buffers == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
-  _backend.uniformbuffer.mapped_buffers = malloc(_backend_info.max_frames_in_flight * sizeof(void *));
-  if (_backend.uniformbuffer.mapped_buffers == NULL)
+  _backend.viewport.uniformbuffer.mapped_buffers = malloc(_backend_info.max_frames_in_flight * sizeof(void *));
+  if (_backend.viewport.uniformbuffer.mapped_buffers == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
@@ -2616,16 +2593,16 @@ static enum prisma_error _backend_uniformbuffer_init(void)
 
   for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
-    _backend_buffer_create(&_backend.uniformbuffer.buffers[i],
+    _backend_buffer_create(&_backend.viewport.uniformbuffer.buffers[i],
                            sizeof(struct _backend_uniformbuffer_object),
                            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vkMapMemory(_backend.device.vk_device,
-                _backend.uniformbuffer.buffers[i].vk_devicememory,
+                _backend.viewport.uniformbuffer.buffers[i].vk_devicememory,
                 0,
                 sizeof(struct _backend_uniformbuffer_object),
                 0,
-                &_backend.uniformbuffer.mapped_buffers[i]);
+                &_backend.viewport.uniformbuffer.mapped_buffers[i]);
   }
 
   return PRISMA_ERROR_NONE;
@@ -2635,10 +2612,10 @@ static void _backend_uniformbuffer_update(void)
 {
   struct timeval timestamp;
 
-  void *mapped_buffer = _backend.uniformbuffer.mapped_buffers[_backend.current_frame_in_flight];
+  void *mapped_buffer = _backend.viewport.uniformbuffer.mapped_buffers[_backend.current_frame_in_flight];
 
   gettimeofday(&timestamp, 0);
-  float t = (timestamp.tv_sec & 0xFF) + timestamp.tv_usec * 1e-6;
+  float t = (timestamp.tv_sec - _backend.timer.tv_sec) + (timestamp.tv_usec - _backend.timer.tv_usec)* 1e-6;
 
   struct _backend_uniformbuffer_object ubo = {
       .resolution = {(float)_backend.viewport.vk_extent.width, (float)_backend.viewport.vk_extent.height, 0.0f},
@@ -2649,15 +2626,15 @@ static void _backend_uniformbuffer_update(void)
 
 static void _backend_uniformbuffer_destroy(void)
 {
-  if (_backend.uniformbuffer.buffers)
+  if (_backend.viewport.uniformbuffer.buffers)
   {
     for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
-      _backend_buffer_destroy(&_backend.uniformbuffer.buffers[i]);
-    free(_backend.uniformbuffer.buffers);
+      _backend_buffer_destroy(&_backend.viewport.uniformbuffer.buffers[i]);
+    free(_backend.viewport.uniformbuffer.buffers);
   }
 
-  if (_backend.uniformbuffer.mapped_buffers)
-    free(_backend.uniformbuffer.mapped_buffers);
+  if (_backend.viewport.uniformbuffer.mapped_buffers)
+    free(_backend.viewport.uniformbuffer.mapped_buffers);
 }
 
 static enum prisma_error _backend_descriptorpool_init(void)
@@ -2672,7 +2649,7 @@ static enum prisma_error _backend_descriptorpool_init(void)
   pool_info.pPoolSizes = &pool_size;
   pool_info.maxSets = pool_size.descriptorCount;
 
-  if (vkCreateDescriptorPool(_backend.device.vk_device, &pool_info, NULL, &_backend.descriptorpool.vk_descriptorpool) != VK_SUCCESS)
+  if (vkCreateDescriptorPool(_backend.device.vk_device, &pool_info, NULL, &_backend.viewport.vk_descriptorpool) != VK_SUCCESS)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create descriptor pool");
     return PRISMA_ERROR_VK;
@@ -2683,13 +2660,13 @@ static enum prisma_error _backend_descriptorpool_init(void)
 
 static void _backend_descriptorpool_destroy(void)
 {
-  vkDestroyDescriptorPool(_backend.device.vk_device, _backend.descriptorpool.vk_descriptorpool, NULL);
+  vkDestroyDescriptorPool(_backend.device.vk_device, _backend.viewport.vk_descriptorpool, NULL);
 }
 
 static enum prisma_error _backend_descriptorsets_init(void)
 {
-  _backend.descriptorsets.vk_descriptorsets = malloc(_backend_info.max_frames_in_flight * sizeof(VkDescriptorSet));
-  if (_backend.descriptorsets.vk_descriptorsets == NULL)
+  _backend.viewport.vk_present_descriptorsets = malloc(_backend_info.max_frames_in_flight * sizeof(VkDescriptorSet));
+  if (_backend.viewport.vk_present_descriptorsets == NULL)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
@@ -2697,14 +2674,14 @@ static enum prisma_error _backend_descriptorsets_init(void)
 
   VkDescriptorSetLayout layouts[_backend_info.max_frames_in_flight];
   for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
-    layouts[i] = _backend.descriptorsetlayout.vk_descriptorsetlayout;
+    layouts[i] = _backend.viewport.vk_descriptorsetlayout;
 
   VkDescriptorSetAllocateInfo allocate_info = {0};
   allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  allocate_info.descriptorPool = _backend.descriptorpool.vk_descriptorpool;
+  allocate_info.descriptorPool = _backend.viewport.vk_descriptorpool;
   allocate_info.descriptorSetCount = _backend_info.max_frames_in_flight;
   allocate_info.pSetLayouts = layouts;
-  if (vkAllocateDescriptorSets(_backend.device.vk_device, &allocate_info, _backend.descriptorsets.vk_descriptorsets) != VK_SUCCESS)
+  if (vkAllocateDescriptorSets(_backend.device.vk_device, &allocate_info, _backend.viewport.vk_present_descriptorsets) != VK_SUCCESS)
   {
     PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to allocate descriptor sets");
     return PRISMA_ERROR_VK;
@@ -2713,13 +2690,13 @@ static enum prisma_error _backend_descriptorsets_init(void)
   for (uint32_t i = 0; i < _backend_info.max_frames_in_flight; i++)
   {
     VkDescriptorBufferInfo frag_buffer_info = {0};
-    frag_buffer_info.buffer = _backend.uniformbuffer.buffers[i].vk_buffer;
+    frag_buffer_info.buffer = _backend.viewport.uniformbuffer.buffers[i].vk_buffer;
     frag_buffer_info.offset = 0;
-    frag_buffer_info.range = _backend.uniformbuffer.size;
+    frag_buffer_info.range = _backend.viewport.uniformbuffer.size;
 
     VkWriteDescriptorSet frag_descriptor_write = {0};
     frag_descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    frag_descriptor_write.dstSet = _backend.descriptorsets.vk_descriptorsets[i];
+    frag_descriptor_write.dstSet = _backend.viewport.vk_present_descriptorsets[i];
     frag_descriptor_write.dstBinding = 0;
     frag_descriptor_write.dstArrayElement = 0;
     frag_descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -2734,8 +2711,6 @@ static enum prisma_error _backend_descriptorsets_init(void)
 
 static void _backend_descriptorsets_destroy(void)
 {
-  if (_backend.descriptorsets.vk_descriptorsets)
-  {
-    free(_backend.descriptorsets.vk_descriptorsets);
-  }
+  if (_backend.viewport.vk_present_descriptorsets)
+    free(_backend.viewport.vk_present_descriptorsets);
 }
