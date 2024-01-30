@@ -30,7 +30,7 @@ enum prisma_error prisma_window_init(struct prisma_window_info *info)
         info->application_name, NULL, NULL);
     if (!_window.glfw_window)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_GLFW, "Failed to create window");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_GLFW, "Failed to create window");
         return PRISMA_ERROR_GLFW;
     }
 
@@ -61,7 +61,7 @@ enum prisma_error prisma_window_create_surface(void * instance, void *surface)
 {
     if (glfwCreateWindowSurface(*(VkInstance*) instance, _window.glfw_window, NULL, (VkSurfaceKHR*) surface) != VK_SUCCESS)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_GLFW, "Failed to create window surface");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_GLFW, "Failed to create window surface");
         return PRISMA_ERROR_GLFW;
     }
     return PRISMA_ERROR_NONE;
@@ -87,7 +87,7 @@ enum prisma_error primsa_window_init_ui(void)
 {
     if (!ImGui_ImplGlfw_InitForVulkan(_window.glfw_window, true))
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_GLFW, "Failed to instantiate GLFw for ImGUI");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_GLFW, "Failed to instantiate GLFw for ImGUI");
         return PRISMA_ERROR_GLFW; 
     }
     return PRISMA_ERROR_NONE;

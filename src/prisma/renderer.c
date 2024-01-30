@@ -331,7 +331,7 @@ enum prisma_error prisma_renderer_draw(void)
 
   if (vkWaitForFences(_backend.device.vk_device, 1, &_backend.sync.vk_render_fence[_backend.current_frame_in_flight], VK_TRUE, 1000000000) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to wait render fence");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to wait render fence");
     return PRISMA_ERROR_VK;
   }
 
@@ -349,7 +349,7 @@ enum prisma_error prisma_renderer_draw(void)
 
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to acquire next image");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to acquire next image");
     return PRISMA_ERROR_VK;
   }
 
@@ -357,7 +357,7 @@ enum prisma_error prisma_renderer_draw(void)
 
   if (vkResetFences(_backend.device.vk_device, 1, &_backend.sync.vk_render_fence[_backend.current_frame_in_flight]) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset render fence");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to reset render fence");
     return PRISMA_ERROR_VK;
   }
 
@@ -365,7 +365,7 @@ enum prisma_error prisma_renderer_draw(void)
   {
     if (vkResetCommandBuffer(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight], 0) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset command buffer");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to reset command buffer");
       return PRISMA_ERROR_VK;
     }
 
@@ -374,7 +374,7 @@ enum prisma_error prisma_renderer_draw(void)
     commandbufferbegin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     if (vkBeginCommandBuffer(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight], &commandbufferbegin_info) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset begin command buffer");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to reset begin command buffer");
       return PRISMA_ERROR_VK;
     }
 
@@ -423,7 +423,7 @@ enum prisma_error prisma_renderer_draw(void)
 
     if (vkEndCommandBuffer(_backend.viewport.vk_commandbuffers[_backend.current_frame_in_flight]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset end command buffer");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to reset end command buffer");
       return PRISMA_ERROR_VK;
     }
   }
@@ -432,7 +432,7 @@ enum prisma_error prisma_renderer_draw(void)
   {
     if (vkResetCommandBuffer(_backend.ui.vk_commandbuffers[_backend.current_frame_in_flight], 0) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset command buffer");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to reset command buffer");
       return PRISMA_ERROR_VK;
     }
 
@@ -441,7 +441,7 @@ enum prisma_error prisma_renderer_draw(void)
     commandbufferbegin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     if (vkBeginCommandBuffer(_backend.ui.vk_commandbuffers[_backend.current_frame_in_flight], &commandbufferbegin_info) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset begin command buffer");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to reset begin command buffer");
       return PRISMA_ERROR_VK;
     }
 
@@ -466,7 +466,7 @@ enum prisma_error prisma_renderer_draw(void)
 
     if (vkEndCommandBuffer(_backend.ui.vk_commandbuffers[_backend.current_frame_in_flight]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to reset end command buffer");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to reset end command buffer");
       return PRISMA_ERROR_VK;
     }
   }
@@ -487,7 +487,7 @@ enum prisma_error prisma_renderer_draw(void)
   submit_info.pSignalSemaphores = &_backend.sync.vk_render_semaphore[_backend.current_frame_in_flight];
   if (vkQueueSubmit(_backend.device.vk_graphic_queue, 1, &submit_info, _backend.sync.vk_render_fence[_backend.current_frame_in_flight]) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to submit command buffer to the queue");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to submit command buffer to the queue");
     return PRISMA_ERROR_VK;
   }
 
@@ -504,7 +504,7 @@ enum prisma_error prisma_renderer_draw(void)
 
   if (result != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to present rendered images");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to present rendered images");
     return PRISMA_ERROR_VK;
   }
 
@@ -552,7 +552,7 @@ enum prisma_error prisma_renderer_init_ui(void)
 
   if (vkCreateDescriptorPool(_backend.device.vk_device, &pool_info, NULL, &_backend.ui.vk_descriptorpool) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create descriptor pool");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create descriptor pool");
     return PRISMA_ERROR_VK;
   }
 
@@ -594,7 +594,7 @@ enum prisma_error prisma_renderer_init_ui(void)
   render_pass_info.pDependencies = &dependency;
   if (vkCreateRenderPass(_backend.device.vk_device, &render_pass_info, NULL, &_backend.ui.vk_renderpass) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create render pass");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create render pass");
     return PRISMA_ERROR_VK;
   }
 
@@ -605,7 +605,7 @@ enum prisma_error prisma_renderer_init_ui(void)
   commandpool_info.queueFamilyIndex = _backend.device.vk_graphic_queue_index;
   if (vkCreateCommandPool(_backend.device.vk_device, &commandpool_info, NULL, &_backend.ui.vk_commandpool) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create command pool");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create command pool");
     return PRISMA_ERROR_VK;
   }
 
@@ -613,7 +613,7 @@ enum prisma_error prisma_renderer_init_ui(void)
   _backend.ui.vk_commandbuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkCommandBuffer));
   if (_backend.ui.vk_commandbuffers == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -624,7 +624,7 @@ enum prisma_error prisma_renderer_init_ui(void)
   commandbuffers_info.commandBufferCount = _backend_info.max_frames_in_flight;
   if (vkAllocateCommandBuffers(_backend.device.vk_device, &commandbuffers_info, _backend.ui.vk_commandbuffers) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create command buffer");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create command buffer");
     return PRISMA_ERROR_VK;
   }
 
@@ -632,7 +632,7 @@ enum prisma_error prisma_renderer_init_ui(void)
   _backend.ui.vk_framebuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkFramebuffer));
   if (_backend.ui.vk_framebuffers == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -664,7 +664,7 @@ enum prisma_error prisma_renderer_init_ui(void)
   vulkan_impl_info.MSAASamples = _backend_info.sample_count;
   if (!ImGui_ImplVulkan_Init(&vulkan_impl_info, _backend.ui.vk_renderpass))
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to instantiate Vulkan for ImGUI");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to instantiate Vulkan for ImGUI");
     return PRISMA_ERROR_VK;
   }
 
@@ -712,7 +712,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
   commandpool_info.queueFamilyIndex = _backend.device.vk_graphic_queue_index;
   if (vkCreateCommandPool(_backend.device.vk_device, &commandpool_info, NULL, &_backend.viewport.vk_commandpool) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create command pool");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create command pool");
     return PRISMA_ERROR_VK;
   }
 
@@ -720,7 +720,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
   _backend.viewport.vk_commandbuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkCommandBuffer));
   if (_backend.viewport.vk_commandbuffers == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -731,7 +731,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
   commandbuffers_info.commandBufferCount = _backend_info.max_frames_in_flight;
   if (vkAllocateCommandBuffers(_backend.device.vk_device, &commandbuffers_info, _backend.viewport.vk_commandbuffers) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create command buffer");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create command buffer");
     return PRISMA_ERROR_VK;
   }
 
@@ -756,7 +756,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
 
   if (vkCreateSampler(_backend.device.vk_device, &samplerInfo, NULL, &_backend.viewport.vk_sampler) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create sampler for ImGUI");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create sampler for ImGUI");
     return PRISMA_ERROR_VK;
   }
 
@@ -764,14 +764,14 @@ enum prisma_error prisma_renderer_init_viewport(void)
   _backend.viewport.vk_images = malloc(_backend_info.max_frames_in_flight * sizeof(VkImage));
   if (_backend.viewport.vk_images == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
   _backend.viewport.vk_device_memories = malloc(_backend_info.max_frames_in_flight * sizeof(VkDeviceMemory));
   if (_backend.viewport.vk_device_memories == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -793,7 +793,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
 
     if (vkCreateImage(_backend.device.vk_device, &imagecreate_info, NULL, &_backend.viewport.vk_images[i]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create image");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create image");
       return PRISMA_ERROR_VK;
     }
 
@@ -819,13 +819,13 @@ enum prisma_error prisma_renderer_init_viewport(void)
     alloc_info.memoryTypeIndex = memory_type_index;
     if (vkAllocateMemory(_backend.device.vk_device, &alloc_info, NULL, &_backend.viewport.vk_device_memories[i]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to allocate image memory");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to allocate image memory");
       return PRISMA_ERROR_VK;
     }
 
     if (vkBindImageMemory(_backend.device.vk_device, _backend.viewport.vk_images[i], _backend.viewport.vk_device_memories[i], 0) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to bind image memory");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to bind image memory");
       return PRISMA_ERROR_VK;
     }
 
@@ -881,7 +881,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
   _backend.viewport.vk_image_views = malloc(_backend_info.max_frames_in_flight * sizeof(VkImageView));
   if (_backend.viewport.vk_image_views == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -903,7 +903,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
     imageview_createinfo.subresourceRange.layerCount = 1;
     if (vkCreateImageView(_backend.device.vk_device, &imageview_createinfo, NULL, &_backend.viewport.vk_image_views[i]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create image view");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create image view");
       return PRISMA_ERROR_VK;
     }
   }
@@ -946,7 +946,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
   render_pass_info.pDependencies = &dependency;
   if (vkCreateRenderPass(_backend.device.vk_device, &render_pass_info, NULL, &_backend.viewport.vk_renderpass) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create render pass");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create render pass");
     return PRISMA_ERROR_VK;
   }
 
@@ -954,7 +954,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
   _backend.viewport.vk_framebuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkFramebuffer));
   if (_backend.viewport.vk_framebuffers == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -1011,7 +1011,7 @@ enum prisma_error prisma_renderer_init_viewport(void)
   _backend.viewport.vk_texture_descriptorsets = malloc(_backend_info.max_frames_in_flight * sizeof(VkDescriptorSet));
   if (_backend.viewport.vk_texture_descriptorsets == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -1051,9 +1051,9 @@ enum prisma_error prisma_renderer_update_viewport(const char *path)
 {
   enum prisma_error error = PRISMA_ERROR_NONE;
 
-  _backend_device_wait_idle();
+  PRISMA_LOG_INFO("Compile shader %s...\n", path);
 
-  vkDestroyPipeline(_backend.device.vk_device, _backend.viewport.vk_pipeline, NULL);
+  _backend_device_wait_idle();
 
   _backend_shader_destroy(_backend.viewport.vk_frag_shader_module);
 
@@ -1061,9 +1061,13 @@ enum prisma_error prisma_renderer_update_viewport(const char *path)
   if (error != PRISMA_ERROR_NONE)
     return error;
 
+  vkDestroyPipeline(_backend.device.vk_device, _backend.viewport.vk_pipeline, NULL);
+
   error = _backend_pipeline_create();
   if (error != PRISMA_ERROR_NONE)
     return error;
+
+  PRISMA_LOG_INFO("Done.\n");
   
   return error;
 }
@@ -1186,7 +1190,7 @@ static enum prisma_error _backend_instance_create_instance(void)
 
   if (vkCreateInstance(&create_info, NULL, &_backend.instance.vk_instance) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create instance");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create instance");
     return PRISMA_ERROR_VK;
   }
 
@@ -1217,13 +1221,13 @@ static enum prisma_error _backend_instance_create_debug_instance(void)
 
   if (!func)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to set up debug messenger");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to set up debug messenger");
     return PRISMA_ERROR_VK;
   }
 
   if (func(_backend.instance.vk_instance, &debug_create_info, NULL, &_backend.instance.vk_debug_messenger) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to set up debug messenger");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to set up debug messenger");
     return PRISMA_ERROR_VK;
   }
 
@@ -1283,7 +1287,7 @@ static enum prisma_error _backend_device_pick_physical_device(void)
   vkEnumeratePhysicalDevices(_backend.instance.vk_instance, &device_count, NULL);
   if (!device_count)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to find GPUs with Vulkan support");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to find GPUs with Vulkan support");
     return PRISMA_ERROR_VK;
   }
 
@@ -1302,7 +1306,7 @@ static enum prisma_error _backend_device_pick_physical_device(void)
     }
   }
 
-  PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to find a suitable GPU");
+  PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to find a suitable GPU");
   return PRISMA_ERROR_VK;
 }
 
@@ -1554,7 +1558,7 @@ static enum prisma_error _backend_device_create_logical_device(void)
 
   if (vkCreateDevice(_backend.device.vk_physical_device, &create_info, NULL, &_backend.device.vk_device) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create logical device");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create logical device");
     return PRISMA_ERROR_VK;
   }
 
@@ -1580,25 +1584,25 @@ static enum prisma_error _backend_swapchain_init(void)
 {
   if (!_backend_swapchain_check_surface_format_support())
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "No swapchain support for desired surface format");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "No swapchain support for desired surface format");
     return PRISMA_ERROR_VK;
   }
 
   if (!_backend_swapchain_check_present_mode_support())
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "No swapchain support for desired present mode");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "No swapchain support for desired present mode");
     return PRISMA_ERROR_VK;
   }
 
   if (!_backend_swapchain_check_image_count_support())
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "No swapchain support for desired image count");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "No swapchain support for desired image count");
     return PRISMA_ERROR_VK;
   }
 
   if (!_backend_swapchain_check_array_layer_count_support())
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "No swapchain support for desired array layer count");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "No swapchain support for desired array layer count");
     return PRISMA_ERROR_VK;
   }
 
@@ -1639,7 +1643,7 @@ static enum prisma_error _backend_swapchain_init(void)
   swapchain_create_info.oldSwapchain = NULL;
   if (vkCreateSwapchainKHR(_backend.device.vk_device, &swapchain_create_info, NULL, &_backend.swapchain.vk_swapchain) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create swap chain");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create swap chain");
     return PRISMA_ERROR_VK;
   }
 
@@ -1648,7 +1652,7 @@ static enum prisma_error _backend_swapchain_init(void)
   _backend.swapchain.vk_images = malloc(_backend_info.max_frames_in_flight * sizeof(VkImage));
   if (_backend.swapchain.vk_images == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -1657,7 +1661,7 @@ static enum prisma_error _backend_swapchain_init(void)
   _backend.swapchain.vk_image_views = malloc(_backend_info.max_frames_in_flight * sizeof(VkImageView));
   if (_backend.swapchain.vk_image_views == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -1679,7 +1683,7 @@ static enum prisma_error _backend_swapchain_init(void)
     imageview_createinfo.subresourceRange.layerCount = 1;
     if (vkCreateImageView(_backend.device.vk_device, &imageview_createinfo, NULL, &_backend.swapchain.vk_image_views[i]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create image view");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create image view");
       return PRISMA_ERROR_VK;
     }
   }
@@ -1837,7 +1841,7 @@ static enum prisma_error _backend_swapchain_recreate(void)
   _backend.ui.vk_framebuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkFramebuffer));
   if (_backend.ui.vk_framebuffers == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -1858,14 +1862,14 @@ static enum prisma_error _backend_swapchain_recreate(void)
   _backend.viewport.vk_images = malloc(_backend_info.max_frames_in_flight * sizeof(VkImage));
   if (_backend.viewport.vk_images == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
   _backend.viewport.vk_device_memories = malloc(_backend_info.max_frames_in_flight * sizeof(VkDeviceMemory));
   if (_backend.viewport.vk_device_memories == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -1887,7 +1891,7 @@ static enum prisma_error _backend_swapchain_recreate(void)
 
     if (vkCreateImage(_backend.device.vk_device, &imagecreate_info, NULL, &_backend.viewport.vk_images[i]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create image");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create image");
       return PRISMA_ERROR_VK;
     }
 
@@ -1913,13 +1917,13 @@ static enum prisma_error _backend_swapchain_recreate(void)
     alloc_info.memoryTypeIndex = memory_type_index;
     if (vkAllocateMemory(_backend.device.vk_device, &alloc_info, NULL, &_backend.viewport.vk_device_memories[i]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to allocate image memory");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to allocate image memory");
       return PRISMA_ERROR_VK;
     }
 
     if (vkBindImageMemory(_backend.device.vk_device, _backend.viewport.vk_images[i], _backend.viewport.vk_device_memories[i], 0) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to bind image memory");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to bind image memory");
       return PRISMA_ERROR_VK;
     }
 
@@ -1975,7 +1979,7 @@ static enum prisma_error _backend_swapchain_recreate(void)
   _backend.viewport.vk_image_views = malloc(_backend_info.max_frames_in_flight * sizeof(VkImageView));
   if (_backend.viewport.vk_image_views == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -1997,7 +2001,7 @@ static enum prisma_error _backend_swapchain_recreate(void)
     imageview_createinfo.subresourceRange.layerCount = 1;
     if (vkCreateImageView(_backend.device.vk_device, &imageview_createinfo, NULL, &_backend.viewport.vk_image_views[i]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create image view");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create image view");
       return PRISMA_ERROR_VK;
     }
   }
@@ -2005,7 +2009,7 @@ static enum prisma_error _backend_swapchain_recreate(void)
   _backend.viewport.vk_framebuffers = malloc(_backend_info.max_frames_in_flight * sizeof(VkFramebuffer));
   if (_backend.viewport.vk_framebuffers == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -2025,7 +2029,7 @@ static enum prisma_error _backend_swapchain_recreate(void)
   _backend.viewport.vk_texture_descriptorsets = malloc(_backend_info.max_frames_in_flight * sizeof(VkDescriptorSet));
   if (_backend.viewport.vk_texture_descriptorsets == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -2057,21 +2061,21 @@ static enum prisma_error _backend_sync_init(void)
   _backend.sync.vk_render_fence = malloc(_backend_info.max_frames_in_flight * sizeof(VkFence));
   if (_backend.sync.vk_render_fence == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
   _backend.sync.vk_render_semaphore = malloc(_backend_info.max_frames_in_flight * sizeof(VkSemaphore));
   if (_backend.sync.vk_render_semaphore == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
   _backend.sync.vk_present_semaphore = malloc(_backend_info.max_frames_in_flight * sizeof(VkSemaphore));
   if (_backend.sync.vk_present_semaphore == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -2086,17 +2090,17 @@ static enum prisma_error _backend_sync_init(void)
   {
     if (vkCreateFence(_backend.device.vk_device, &fence_info, NULL, &_backend.sync.vk_render_fence[i]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create render fence");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create render fence");
       return PRISMA_ERROR_VK;
     }
     if (vkCreateSemaphore(_backend.device.vk_device, &semaphore_info, NULL, &_backend.sync.vk_render_semaphore[i]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create render semaphore");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create render semaphore");
       return PRISMA_ERROR_VK;
     }
     if (vkCreateSemaphore(_backend.device.vk_device, &semaphore_info, NULL, &_backend.sync.vk_present_semaphore[i]) != VK_SUCCESS)
     {
-      PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create present semaphore");
+      PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create present semaphore");
       return PRISMA_ERROR_VK;
     }
   }
@@ -2122,7 +2126,7 @@ static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_st
   FILE *fd = fopen(path, "r");
   if (!fd)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_FILE, path);
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_FILE, path);
     return PRISMA_ERROR_FILE;
   }
 
@@ -2132,7 +2136,7 @@ static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_st
   buffer = malloc(size + 1* sizeof(uint8_t));
   if (buffer == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -2164,11 +2168,11 @@ static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_st
 
   if (!glslang_shader_preprocess(glsl_shader, &glsl_input))
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_GLSL, "GLSL preprocessing failed");
-    PRISMA_LOG_ERROR_INFO("%s\n", path);
-    PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_info_log(glsl_shader));
-    PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_info_debug_log(glsl_shader));
-    PRISMA_LOG_ERROR_INFO("%s\n", glsl_input.code);
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_GLSL, "GLSL preprocessing failed");
+    PRISMA_LOG_ERROR("%s\n", path);
+    PRISMA_LOG_ERROR("%s\n", glslang_shader_get_info_log(glsl_shader));
+    PRISMA_LOG_ERROR("%s\n", glslang_shader_get_info_debug_log(glsl_shader));
+    PRISMA_LOG_ERROR("%s\n", glsl_input.code);
     glslang_shader_delete(glsl_shader);
     glslang_finalize_process();
     free(buffer);
@@ -2177,11 +2181,11 @@ static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_st
 
   if (!glslang_shader_parse(glsl_shader, &glsl_input))
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_GLSL, "GLSL parsing failed");
-    PRISMA_LOG_ERROR_INFO("%s\n", path);
-    PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_info_log(glsl_shader));
-    PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_info_debug_log(glsl_shader));
-    PRISMA_LOG_ERROR_INFO("%s\n", glslang_shader_get_preprocessed_code(glsl_shader));
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_GLSL, "GLSL parsing failed");
+    PRISMA_LOG_ERROR("%s\n", path);
+    PRISMA_LOG_ERROR("%s\n", glslang_shader_get_info_log(glsl_shader));
+    PRISMA_LOG_ERROR("%s\n", glslang_shader_get_info_debug_log(glsl_shader));
+    PRISMA_LOG_ERROR("%s\n", glslang_shader_get_preprocessed_code(glsl_shader));
     glslang_shader_delete(glsl_shader);
     glslang_finalize_process();
     free(buffer);
@@ -2195,10 +2199,10 @@ static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_st
 
   if (!glslang_program_link(glsl_program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT))
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_GLSL, "GLSL linking failed");
-    PRISMA_LOG_ERROR_INFO("%s\n", path);
-    PRISMA_LOG_ERROR_INFO("%s\n", glslang_program_get_info_log(glsl_program));
-    PRISMA_LOG_ERROR_INFO("%s\n", glslang_program_get_info_debug_log(glsl_program));
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_GLSL, "GLSL linking failed");
+    PRISMA_LOG_ERROR("%s\n", path);
+    PRISMA_LOG_ERROR("%s\n", glslang_program_get_info_log(glsl_program));
+    PRISMA_LOG_ERROR("%s\n", glslang_program_get_info_debug_log(glsl_program));
     glslang_program_delete(glsl_program);
     glslang_shader_delete(glsl_shader);
     glslang_finalize_process();
@@ -2217,7 +2221,7 @@ static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_st
   {
     glslang_program_delete(glsl_program);
     glslang_finalize_process();
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create shader module");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create shader module");
     return PRISMA_ERROR_VK;
   }
 
@@ -2247,7 +2251,7 @@ static enum prisma_error _backend_descriptorsetlayout_init(void)
   layout_info.pBindings = &ubo_layoutbinding_info;
   if (vkCreateDescriptorSetLayout(_backend.device.vk_device, &layout_info, NULL, &_backend.viewport.vk_descriptorsetlayout) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create descriptor set layout");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create descriptor set layout");
     return PRISMA_ERROR_VK;
   }
 
@@ -2272,7 +2276,7 @@ static enum prisma_error _backend_pipelinelayout_init(void)
   if (vkCreatePipelineLayout(_backend.device.vk_device, &pipelinelayout_info, NULL, &_backend.viewport.vk_pipelinelayout) !=
       VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create pipeline layout");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create pipeline layout");
     return PRISMA_ERROR_VK;
   }
 
@@ -2384,7 +2388,7 @@ static enum prisma_error _backend_pipeline_create(void)
   pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
   if (vkCreateGraphicsPipelines(_backend.device.vk_device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &_backend.viewport.vk_pipeline) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create pipeline");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create pipeline");
     return PRISMA_ERROR_VK;
   }
   return PRISMA_ERROR_NONE;
@@ -2402,7 +2406,7 @@ static enum prisma_error _backend_buffer_create(struct _backend_buffer *buffer,
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   if (vkCreateBuffer(_backend.device.vk_device, &buffer_info, NULL, &buffer->vk_buffer) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create vertex buffer");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create vertex buffer");
     return PRISMA_ERROR_VK;
   }
 
@@ -2427,7 +2431,7 @@ static enum prisma_error _backend_buffer_create(struct _backend_buffer *buffer,
   alloc_info.memoryTypeIndex = memory_type_index;
   if (vkAllocateMemory(_backend.device.vk_device, &alloc_info, NULL, &buffer->vk_devicememory) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to allocate vertex buffer memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to allocate vertex buffer memory");
     return PRISMA_ERROR_VK;
   }
 
@@ -2580,14 +2584,14 @@ static enum prisma_error _backend_uniformbuffer_init(void)
   _backend.viewport.uniformbuffer.buffers = malloc(_backend_info.max_frames_in_flight * sizeof(struct _backend_buffer));
   if (_backend.viewport.uniformbuffer.buffers == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
   _backend.viewport.uniformbuffer.mapped_buffers = malloc(_backend_info.max_frames_in_flight * sizeof(void *));
   if (_backend.viewport.uniformbuffer.mapped_buffers == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -2651,7 +2655,7 @@ static enum prisma_error _backend_descriptorpool_init(void)
 
   if (vkCreateDescriptorPool(_backend.device.vk_device, &pool_info, NULL, &_backend.viewport.vk_descriptorpool) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to create descriptor pool");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create descriptor pool");
     return PRISMA_ERROR_VK;
   }
 
@@ -2668,7 +2672,7 @@ static enum prisma_error _backend_descriptorsets_init(void)
   _backend.viewport.vk_present_descriptorsets = malloc(_backend_info.max_frames_in_flight * sizeof(VkDescriptorSet));
   if (_backend.viewport.vk_present_descriptorsets == NULL)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Failed to allocate memory");
     return PRISMA_ERROR_MEMORY;
   }
 
@@ -2683,7 +2687,7 @@ static enum prisma_error _backend_descriptorsets_init(void)
   allocate_info.pSetLayouts = layouts;
   if (vkAllocateDescriptorSets(_backend.device.vk_device, &allocate_info, _backend.viewport.vk_present_descriptorsets) != VK_SUCCESS)
   {
-    PRISMA_LOG_ERROR(PRISMA_ERROR_VK, "Failed to allocate descriptor sets");
+    PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to allocate descriptor sets");
     return PRISMA_ERROR_VK;
   }
 

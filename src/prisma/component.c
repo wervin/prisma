@@ -31,7 +31,7 @@ struct prisma_component *prisma_component_new(enum prisma_component_type type)
 #undef X
 
     default:
-        PRISMA_LOG_ERROR(PRISMA_ERROR_UNKNOWN, "Unknown component type");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_UNKNOWN, "Unknown component type");
         return NULL;
     }
 }
@@ -49,7 +49,7 @@ enum prisma_error prisma_component_draw(struct prisma_component *component)
 #undef X
 
     default:
-        PRISMA_LOG_ERROR(PRISMA_ERROR_UNKNOWN, "Unknown component type");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_UNKNOWN, "Unknown component type");
         return PRISMA_ERROR_UNKNOWN;
     }
 }
@@ -68,6 +68,6 @@ void prisma_component_free(struct prisma_component *component)
 #undef X
 
     default:
-        PRISMA_LOG_ERROR(PRISMA_ERROR_UNKNOWN, "Unknown component type");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_UNKNOWN, "Unknown component type");
     }
 }

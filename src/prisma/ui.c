@@ -112,9 +112,9 @@ enum prisma_error prisma_ui_draw(void)
         igDockBuilderRemoveNode(dockspace_id);
         igDockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_None);
         dock_id = dockspace_id;
-        editor_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Left, 0.4f, NULL, &dock_id);
+        editor_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Left, 0.5f, NULL, &dock_id);
         log_id = igDockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.25f, NULL, &editor_id);
-        viewport_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Right, 0.6f, NULL, &dock_id);
+        viewport_id = igDockBuilderSplitNode(dock_id, ImGuiDir_Right, 0.5f, NULL, &dock_id);
         init_docking = false;
     }
 

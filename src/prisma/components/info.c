@@ -15,7 +15,7 @@ struct prisma_info * prisma_info_new(void)
     info = calloc(1, sizeof(struct prisma_info));
     if (!info)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot allocate info");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot allocate info");
         return NULL;
     }
 

@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include <cimgui.h>
 
@@ -25,7 +26,7 @@ struct prisma_editor * prisma_editor_new(void)
     editor = calloc(1, sizeof(struct prisma_editor));
     if (!editor)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot allocate editor");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot allocate editor");
         return NULL;
     }
 
@@ -40,7 +41,7 @@ struct prisma_editor * prisma_editor_new(void)
     editor->contexts = sake_vector_new(sizeof(struct prisma_editor_context *), (void (*)(void *))_free_context);
     if (!editor->contexts)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot allocate contexts");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot allocate contexts");
         return NULL;
     }
 
@@ -118,6 +119,13 @@ const char *prisma_editor_context_filename(struct prisma_editor_context *context
 
 enum prisma_error prisma_editor_open(struct prisma_editor *editor, const char *path)
 {
+    for (uint32_t i = 0; i < sake_vector_size(editor->contexts); i++)
+    {
+        struct prisma_editor_context *context = editor->contexts[i];
+        if (strcmp(poulpe_editor_path(context->poulpe), path) == 0)
+            return PRISMA_ERROR_NONE;
+    }
+
     struct poulpe_editor *poulpe_editor = poulpe_editor_new(path);
     if (!poulpe_editor)
         return PRISMA_ERROR_MEMORY;
@@ -125,7 +133,7 @@ enum prisma_error prisma_editor_open(struct prisma_editor *editor, const char *p
     struct prisma_editor_context *context = calloc(1, sizeof(struct prisma_editor_context));
     if (!context)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot allocate new context");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot allocate new context");
         return PRISMA_ERROR_MEMORY;
     }
 
@@ -136,7 +144,7 @@ enum prisma_error prisma_editor_open(struct prisma_editor *editor, const char *p
     editor->contexts = sake_vector_push_back(editor->contexts, &context);
     if (!editor->contexts)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot open new editor");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot open new editor");
         return PRISMA_ERROR_MEMORY;
     }
 
@@ -160,14 +168,14 @@ enum prisma_error _update(struct prisma_editor *editor)
     default_fp = fopen(default_path, "r");
     if (!default_fp)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot open default frag shader file");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot open default frag shader file");
         return PRISMA_ERROR_MEMORY;
     }
 
     tmp_fd = mkstemp(tmp_path);
     if (tmp_fd == -1)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot create temporary file");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot create temporary file");
         fclose(default_fp);
         return PRISMA_ERROR_MEMORY;
     }
@@ -175,7 +183,7 @@ enum prisma_error _update(struct prisma_editor *editor)
     tmp_fp = fdopen(tmp_fd, "w");
     if (!tmp_fp)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot create temporary file");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot create temporary file");
         fclose(default_fp);
         remove(tmp_path);
         return PRISMA_ERROR_MEMORY;
@@ -197,7 +205,7 @@ enum prisma_error _update(struct prisma_editor *editor)
     struct prisma_editor_context *context = calloc(1, sizeof(struct prisma_editor_context));
     if (!context)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot allocate new context");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot allocate new context");
         return PRISMA_ERROR_MEMORY;
     }
 
@@ -208,7 +216,7 @@ enum prisma_error _update(struct prisma_editor *editor)
     editor->contexts = sake_vector_push_back(editor->contexts, &context);
     if (!editor->contexts)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot push back new context");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot push back new context");
         return PRISMA_ERROR_MEMORY;
     }
 

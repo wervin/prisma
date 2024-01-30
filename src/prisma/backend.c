@@ -23,7 +23,7 @@ enum prisma_error prisma_backend_init(void)
     _backend.requests = sake_vector_new(sizeof(struct prisma_request), NULL);
     if (!_backend.requests)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot allocate requests vector");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot allocate requests vector");
         return PRISMA_ERROR_MEMORY;
     }
     
@@ -44,7 +44,7 @@ enum prisma_error prisma_backend_queue_request(struct prisma_request *request)
     _backend.requests = sake_vector_push_back(_backend.requests, request);
     if (!_backend.requests)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot allocate pushback request");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot allocate pushback request");
         return PRISMA_ERROR_MEMORY;
     }
     return PRISMA_ERROR_NONE;

@@ -24,7 +24,7 @@ struct prisma_menu * prisma_menu_new(void)
     menu = calloc(1, sizeof(struct prisma_menu));
     if (!menu)
     {
-        PRISMA_LOG_ERROR(PRISMA_ERROR_MEMORY, "Cannot allocate menu");
+        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_MEMORY, "Cannot allocate menu");
         return NULL;
     }
 
@@ -95,37 +95,38 @@ void prisma_menu_set_ui(struct prisma_menu *menu, struct prisma_ui *ui)
 
 static void new_file_dialog(void *args)
 {
-    struct prisma_menu *menu = (struct prisma_menu *) args;
     nfdchar_t *path = NULL;
-    nfdresult_t result = NFD_SaveDialog(NULL, NULL, &path);
+    nfdresult_t result = NFD_SaveDialog("frag", NULL, &path);
     if (result != NFD_OKAY)
         return;
+    
+    struct prisma_menu *menu = (struct prisma_menu *) args;
 
     free(path);
 }
 
 static void open_file_dialog(void *args)
 {
-    // nfdchar_t *path = NULL;
-    // nfdresult_t result = NFD_OpenDialog(NULL, NULL, &path);
-    // if (result != NFD_OKAY)
-    //     return;
+    nfdchar_t *path = NULL;
+    nfdresult_t result = NFD_OpenDialog("frag", NULL, &path);
+    if (result != NFD_OKAY)
+        return;
     
     struct prisma_menu *menu = (struct prisma_menu *) args;
     struct prisma_editor *editor = menu->ui->editor;
 
-    prisma_editor_open(editor, "/home/wervin/Gits/shaders/default.frag");
-
-    // free(path);
+    prisma_editor_open(editor, path);
+    free(path);
 }
 
 static void save_as_file_dialog(void *args)
 {
-    struct prisma_menu *menu = (struct prisma_menu *) args;
     nfdchar_t *path = NULL;
-    nfdresult_t result = NFD_SaveDialog(NULL, NULL, &path);
+    nfdresult_t result = NFD_SaveDialog("frag", NULL, &path);
     if (result != NFD_OKAY)
         return;
+    
+    struct prisma_menu *menu = (struct prisma_menu *) args;
 
     free(path);
 }
