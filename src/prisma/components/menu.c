@@ -1,8 +1,11 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include <cimgui.h>
 
 #include <nfd.h>
+
+#include <poulpe.h>
 
 #include <sake/macro.h>
 
@@ -13,7 +16,6 @@
 #include "prisma/log.h"
 #include "prisma/backend.h"
 
-static void new_file_dialog(void *args);
 static void open_file_dialog(void *args);
 static void save_as_file_dialog(void *args);
 
@@ -48,11 +50,7 @@ enum prisma_error prisma_menu_draw(struct prisma_menu *menu)
         {
             if (igMenuItem_Bool("New", NULL, false, true))
             {
-                struct prisma_request request = {
-                    .cb = new_file_dialog,
-                    .args = menu
-                };
-                error = prisma_backend_queue_request(&request);
+                error = prisma_editor_new_file(menu->ui->editor);
                 if (error != PRISMA_ERROR_NONE)
                     return error;
             }
@@ -68,6 +66,15 @@ enum prisma_error prisma_menu_draw(struct prisma_menu *menu)
             }
             if (igMenuItem_Bool("Save", NULL, false, true))
             {
+                struct prisma_editor *editor = menu->ui->editor;
+                if (editor->current)
+                {
+                    if (poulpe_editor_save(editor->current->poulpe) != POULPE_ERROR_NONE)
+                    {
+                        PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_POULPE, "Cannot save file");
+                        return PRISMA_ERROR_POULPE;
+                    }
+                }
             }
             if (igMenuItem_Bool("Save As...", NULL, false, true))
             {
@@ -93,18 +100,6 @@ void prisma_menu_set_ui(struct prisma_menu *menu, struct prisma_ui *ui)
     menu->ui = ui;
 }
 
-static void new_file_dialog(void *args)
-{
-    nfdchar_t *path = NULL;
-    nfdresult_t result = NFD_SaveDialog("frag", NULL, &path);
-    if (result != NFD_OKAY)
-        return;
-    
-    struct prisma_menu *menu = (struct prisma_menu *) args;
-
-    free(path);
-}
-
 static void open_file_dialog(void *args)
 {
     nfdchar_t *path = NULL;
@@ -115,7 +110,7 @@ static void open_file_dialog(void *args)
     struct prisma_menu *menu = (struct prisma_menu *) args;
     struct prisma_editor *editor = menu->ui->editor;
 
-    prisma_editor_open(editor, path);
+    prisma_editor_open_file(editor, path);
     free(path);
 }
 
@@ -125,8 +120,10 @@ static void save_as_file_dialog(void *args)
     nfdresult_t result = NFD_SaveDialog("frag", NULL, &path);
     if (result != NFD_OKAY)
         return;
-    
-    struct prisma_menu *menu = (struct prisma_menu *) args;
 
+    struct prisma_menu *menu = (struct prisma_menu *)args;
+    struct prisma_editor *editor = menu->ui->editor;
+
+    prisma_editor_save_as_file(editor, path);
     free(path);
 }

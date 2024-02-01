@@ -134,6 +134,7 @@ struct _backend
   uint64_t frame_count;
   uint32_t current_frame_in_flight;
   struct timeval timer;
+  const char *request_viewport_update_path;
 
   struct _backend_instance instance;
   struct _backend_device device;
@@ -273,6 +274,8 @@ static enum prisma_error _backend_descriptorsets_init(void);
 
 static void _backend_descriptorsets_destroy(void);
 
+static enum prisma_error _backend_viewport_update(void);
+
 static struct _backend _backend = {0};
 
 static struct _backend_info _backend_info = {
@@ -333,6 +336,14 @@ enum prisma_error prisma_renderer_draw(void)
   {
     PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to wait render fence");
     return PRISMA_ERROR_VK;
+  }
+
+  if (_backend.request_viewport_update_path)
+  {
+    enum prisma_error error = _backend_viewport_update();
+    _backend.request_viewport_update_path = NULL;
+    if (error != PRISMA_ERROR_NONE && error != PRISMA_ERROR_GLSL)
+      return error;
   }
 
   uint32_t swapchainImageIndex = 0;
@@ -892,15 +903,15 @@ enum prisma_error prisma_renderer_init_viewport(void)
     imageview_createinfo.image = _backend.viewport.vk_images[i];
     imageview_createinfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     imageview_createinfo.format = _backend_info.vk_surface_format.format;
-    imageview_createinfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imageview_createinfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imageview_createinfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imageview_createinfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imageview_createinfo.components.r = VK_COMPONENT_SWIZZLE_R;
+    imageview_createinfo.components.g = VK_COMPONENT_SWIZZLE_G;
+    imageview_createinfo.components.b = VK_COMPONENT_SWIZZLE_B;
+    imageview_createinfo.components.a = VK_COMPONENT_SWIZZLE_A;
     imageview_createinfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     imageview_createinfo.subresourceRange.baseMipLevel = 0;
-    imageview_createinfo.subresourceRange.levelCount = 1;
+    imageview_createinfo.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     imageview_createinfo.subresourceRange.baseArrayLayer = 0;
-    imageview_createinfo.subresourceRange.layerCount = 1;
+    imageview_createinfo.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
     if (vkCreateImageView(_backend.device.vk_device, &imageview_createinfo, NULL, &_backend.viewport.vk_image_views[i]) != VK_SUCCESS)
     {
       PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_VK, "Failed to create image view");
@@ -1047,29 +1058,9 @@ enum prisma_error prisma_renderer_draw_viewport(void)
   return PRISMA_ERROR_NONE;
 }
 
-enum prisma_error prisma_renderer_update_viewport(const char *path)
+void prisma_renderer_request_viewport_update(const char *path)
 {
-  enum prisma_error error = PRISMA_ERROR_NONE;
-
-  PRISMA_LOG_INFO("Compile shader %s...\n", path);
-
-  _backend_device_wait_idle();
-
-  _backend_shader_destroy(_backend.viewport.vk_frag_shader_module);
-
-  error = _backend_shader_init(&_backend.viewport.vk_frag_shader_module, GLSLANG_STAGE_FRAGMENT, path);
-  if (error != PRISMA_ERROR_NONE)
-    return error;
-
-  vkDestroyPipeline(_backend.device.vk_device, _backend.viewport.vk_pipeline, NULL);
-
-  error = _backend_pipeline_create();
-  if (error != PRISMA_ERROR_NONE)
-    return error;
-
-  PRISMA_LOG_INFO("Done.\n");
-  
-  return error;
+  _backend.request_viewport_update_path = path;
 }
 
 void prisma_renderer_destroy_viewport(void)
@@ -2169,10 +2160,7 @@ static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_st
   if (!glslang_shader_preprocess(glsl_shader, &glsl_input))
   {
     PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_GLSL, "GLSL preprocessing failed");
-    PRISMA_LOG_ERROR("%s\n", path);
-    PRISMA_LOG_ERROR("%s\n", glslang_shader_get_info_log(glsl_shader));
-    PRISMA_LOG_ERROR("%s\n", glslang_shader_get_info_debug_log(glsl_shader));
-    PRISMA_LOG_ERROR("%s\n", glsl_input.code);
+    PRISMA_LOG_ERROR("[%s] %s", path, glslang_shader_get_info_log(glsl_shader));
     glslang_shader_delete(glsl_shader);
     glslang_finalize_process();
     free(buffer);
@@ -2182,10 +2170,7 @@ static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_st
   if (!glslang_shader_parse(glsl_shader, &glsl_input))
   {
     PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_GLSL, "GLSL parsing failed");
-    PRISMA_LOG_ERROR("%s\n", path);
-    PRISMA_LOG_ERROR("%s\n", glslang_shader_get_info_log(glsl_shader));
-    PRISMA_LOG_ERROR("%s\n", glslang_shader_get_info_debug_log(glsl_shader));
-    PRISMA_LOG_ERROR("%s\n", glslang_shader_get_preprocessed_code(glsl_shader));
+    PRISMA_LOG_ERROR("[%s] %s", path, glslang_shader_get_info_log(glsl_shader));
     glslang_shader_delete(glsl_shader);
     glslang_finalize_process();
     free(buffer);
@@ -2200,9 +2185,7 @@ static enum prisma_error _backend_shader_init(VkShaderModule *shader, glslang_st
   if (!glslang_program_link(glsl_program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT))
   {
     PRISMA_LOG_ERROR_INFO(PRISMA_ERROR_GLSL, "GLSL linking failed");
-    PRISMA_LOG_ERROR("%s\n", path);
-    PRISMA_LOG_ERROR("%s\n", glslang_program_get_info_log(glsl_program));
-    PRISMA_LOG_ERROR("%s\n", glslang_program_get_info_debug_log(glsl_program));
+    PRISMA_LOG_ERROR("[%s] %s", path, glslang_program_get_info_log(glsl_program));
     glslang_program_delete(glsl_program);
     glslang_shader_delete(glsl_shader);
     glslang_finalize_process();
@@ -2717,4 +2700,30 @@ static void _backend_descriptorsets_destroy(void)
 {
   if (_backend.viewport.vk_present_descriptorsets)
     free(_backend.viewport.vk_present_descriptorsets);
+}
+
+static enum prisma_error _backend_viewport_update(void)
+{
+  enum prisma_error error = PRISMA_ERROR_NONE;
+
+  PRISMA_LOG_INFO("Compile shader %s...\n", _backend.request_viewport_update_path);
+
+  _backend_device_wait_idle();
+
+  _backend_shader_destroy(_backend.viewport.vk_frag_shader_module);
+  _backend.viewport.vk_frag_shader_module = VK_NULL_HANDLE;
+
+  error = _backend_shader_init(&_backend.viewport.vk_frag_shader_module, GLSLANG_STAGE_FRAGMENT, _backend.request_viewport_update_path);
+  if (error != PRISMA_ERROR_NONE)
+    return error;
+
+  vkDestroyPipeline(_backend.device.vk_device, _backend.viewport.vk_pipeline, NULL);
+
+  error = _backend_pipeline_create();
+  if (error != PRISMA_ERROR_NONE)
+    return error;
+
+  PRISMA_LOG_INFO("Done.\n");
+  
+  return error;
 }

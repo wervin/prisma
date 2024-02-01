@@ -23,6 +23,8 @@ enum prisma_error prisma_renderer_init_viewport(void);
 
 enum prisma_error prisma_renderer_draw_viewport(void);
 
+void prisma_renderer_request_viewport_update(const char *path);
+
 enum prisma_error prisma_renderer_update_viewport(const char *path);
 
 void prisma_renderer_destroy_viewport(void);
