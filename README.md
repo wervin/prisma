@@ -1,6 +1,7 @@
 # Prisma Ray Marching Renderer
-
+![test](https://github.com/wervin/prisma/assets/29201790/71ffc6af-18e8-47dc-95ca-1ffc162d8f46)
 ## Introduction
+
 
 Prisma is a ray marching renderer developed as a hobby project. It's a platform for experimenting with 3D rendering and learning new techniques in graphics programming.
 
