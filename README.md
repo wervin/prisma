@@ -1,5 +1,7 @@
 # Prisma Ray Marching Renderer
-![test](https://github.com/wervin/prisma/assets/29201790/71ffc6af-18e8-47dc-95ca-1ffc162d8f46)
+
+![test](https://github.com/wervin/prisma/assets/29201790/ed67349b-d54c-4c47-bad2-69a0191c8b68)
+
 ## Introduction
 
 
