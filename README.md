@@ -1,15 +1,15 @@
-# Prisma Ray Marching Renderer
+# Prisma
 
 ![test](https://github.com/wervin/prisma/assets/29201790/ed67349b-d54c-4c47-bad2-69a0191c8b68)
 
 ## Introduction
 
 
-Prisma is a ray marching renderer developed as a hobby project. It's a platform for experimenting with 3D rendering and learning new techniques in graphics programming.
+Prisma is another basic Vulkan renderer developed as a hobby project. It's a platform for experimenting with 3D rendering and learning new techniques in graphics programming.
 
 ## Key Features
 
-- Ray Marching Rendering: Basic implementation for educational purposes.
+- Basic Rendering: Basic implementation for educational purposes.
 - Shader Exploration: Experiment with simple shaders.
 - User Interface: Straightforward and easy to use.
 
